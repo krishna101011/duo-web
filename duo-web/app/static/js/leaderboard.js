@@ -1,0 +1,10 @@
+let pointsChart;
+async function loadLeaderboard(){
+  const data=await Duo.api('/api/leaderboard');
+  const podium=document.getElementById('podium');
+  podium.innerHTML=data.players.map((p,i)=>`<div class="podium-card"><div class="podium-rank">#${p.rank} · ${i===0?'weekly leader':'challenger'}</div><div class="podium-avatar">${escapeHtml(p.emoji)}</div><div class="podium-name">${escapeHtml(p.name)}</div><div class="podium-points">${p.weekly}</div><div class="tiny-note">weekly XP</div></div>`).join('');
+  document.getElementById('leaderboardRows').innerHTML=data.players.map(p=>`<div class="rank-row"><div class="rank">#${p.rank}</div><div class="rank-player"><span class="rank-avatar">${escapeHtml(p.emoji)}</span><div><strong>${escapeHtml(p.name)}</strong><small>${p.streak} day streak</small></div></div><div class="rank-stat">TODAY<b>${p.today}</b></div><div class="rank-stat">WEEKLY<b>${p.weekly}</b></div><div class="rank-stat">ALL-TIME<b>${p.all_time}</b></div><div class="rank-stat">STREAK<b>${p.streak}d</b></div></div>`).join('');
+}
+async function renderPointsChart(){const data=await Duo.api('/api/charts?days=14');const ctx=document.getElementById('pointsChart');if(pointsChart)pointsChart.destroy();pointsChart=new Chart(ctx,{type:'bar',data:{labels:data.labels.map(d=>d.slice(5)),datasets:data.players.map((p,i)=>({label:p.name,data:p.points,backgroundColor:i===0?'rgba(88,103,255,.58)':'rgba(237,77,182,.5)',borderRadius:5}))},options:{responsive:true,plugins:{legend:{labels:{color:getComputedStyle(document.body).getPropertyValue('--muted')}}},scales:{x:{stacked:false,ticks:{color:getComputedStyle(document.body).getPropertyValue('--muted')},grid:{display:false}},y:{beginAtZero:true,ticks:{color:getComputedStyle(document.body).getPropertyValue('--muted')},grid:{color:'rgba(100,110,140,.08)'}}}}});}
+(async function(){try{await loadLeaderboard();await renderPointsChart();}catch(e){Duo.toast(e.message);}})();
+function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}

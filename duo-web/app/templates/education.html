@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Education{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">EDUCATION / STUDY LOG</span><h1>Learn in parallel.</h1><p>Each player keeps their own daily study entries. The total-minute bar at the bottom is the single source of truth for today's study time.</p></div></div>
+<div class="duo-columns" id="educationColumns"></div>
+<section class="wide-card glass-panel study-total-bar" id="studyTotalBar"></section>
+<section class="wide-card glass-panel chart-card"><div class="section-title"><div><span class="mono-label">LAST 14 DAYS</span><h2>Study time overlay</h2></div><span class="tiny-note">minutes / day</span></div><canvas id="studyChart" height="110"></canvas></section>
+<div class="drawer" id="educationEntryModal" hidden></div>
+{% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><script src="/static/js/education.js"></script>{% endblock %}

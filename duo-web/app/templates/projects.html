@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Projects{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">PROJECTS / SHARED BUILD BOARD</span><h1>Make ideas <span class="gradient-text">visible.</span></h1><p>Every project has an aim, missions, progress notes, assigned ownership, and a progress bar calculated from completed tasks.</p></div><button class="primary-btn" data-action="create-project">＋ New project</button></div>
+<section class="project-summary-row" id="projectSummary"></section>
+<section class="project-board glass-panel"><div class="section-title"><div><span class="mono-label">PROJECT BOARD</span><h2>Active files</h2></div><span class="tiny-note">open any file to manage missions</span></div><div id="projectList" class="project-list"></div></section>
+<div id="projectModal" class="modal-shell" hidden></div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/projects.js"></script>{% endblock %}

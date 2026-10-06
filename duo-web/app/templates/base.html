@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Duo Tracker{% endblock %}</title>
+  <meta name="description" content="Duo Tracker: a two-person self-improvement cockpit.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body data-theme="glass">
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="app-shell">
+  <aside class="sidebar glass-panel">
+    <a class="brand" href="/">
+      <span class="brand-logo">D</span>
+      <span><strong>DUO TRACKER</strong><small>two players · one scoreboard</small></span>
+    </a>
+    <nav class="side-nav" aria-label="Primary navigation">
+      <a class="nav-item {% if page == 'home' %}active{% endif %}" href="/"><span>⌂</span> Home</a>
+      <a class="nav-item {% if page == 'education' %}active{% endif %}" href="/education"><span>📚</span> Education</a>
+      <a class="nav-item {% if page == 'fitness' %}active{% endif %}" href="/fitness"><span>🏃</span> Fitness</a>
+      <a class="nav-item {% if page == 'projects' %}active{% endif %}" href="/projects"><span>🧪</span> Projects</a>
+      <a class="nav-item {% if page == 'leaderboard' %}active{% endif %}" href="/leaderboard"><span>🏆</span> Leaderboard</a>
+      <a class="nav-item {% if page == 'graph' %}active{% endif %}" href="/graph"><span>◌</span> Graph</a>
+      <div class="nav-section">Your tabs</div>
+      {% for tab in custom_tabs %}
+        <a class="nav-item {% if page == 'custom' and active_tab_id == tab.id %}active{% endif %}" href="/tabs/{{ tab.id }}"><span>{{ tab.icon }}</span> {{ tab.name }}</a>
+      {% else %}
+        <div class="nav-empty">Create your first custom tab from Home.</div>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-bottom">
+      <a class="nav-item {% if page == 'settings' %}active{% endif %}" href="/settings"><span>⚙</span> Settings</a>
+      <a class="export-link" href="/api/export.csv">Export CSV ↓</a>
+    </div>
+  </aside>
+
+  <main class="main-shell">
+    <header class="topbar glass-panel">
+      <div class="mobile-brand"><a href="/" class="brand"><span class="brand-logo">D</span><span><strong>DUO TRACKER</strong><small>shared progress</small></span></a></div>
+      <div class="player-cluster">
+        {% for player in players[:2] %}
+        <div class="player-chip player-{{ loop.index }}">
+          <div class="avatar-actions"><label class="avatar-shell small-avatar" title="Upload avatar">
+            {% if player.avatar_path %}<img src="{{ player.avatar_path }}" alt="{{ player.name }} avatar">{% else %}<span>{{ player.emoji }}</span>{% endif %}
+            <input class="hidden-file avatar-upload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-player-id="{{ player.id }}">
+          </label><button class="emoji-avatar-btn" type="button" data-player-id="{{ player.id }}" title="Pick emoji">☺</button></div>
+          <div class="player-chip-text">
+            <span class="mono-label">PLAYER {{ "%02d"|format(loop.index) }}</span>
+            <input class="player-name" type="text" value="{{ player.name }}" data-player-id="{{ player.id }}" aria-label="Player {{ loop.index }} name">
+          </div>
+          <span class="player-points" data-points-id="{{ player.id }}">•••</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="top-actions">
+        <span class="date-pill">{{ current_date }}</span>
+        <button class="icon-btn" id="themeToggle" title="Toggle light/dark glass">◐</button>
+        <button class="icon-btn" id="backgroundButton" title="Customize background">✦</button>
+      </div>
+    </header>
+
+    <section class="global-compare glass-panel" id="globalCompare">
+      <div class="compare-label-block"><span class="mono-label">TODAY'S DUEL</span><strong id="topRivalry">Syncing the scoreboard…</strong></div>
+      <div class="compare-stat"><span>Study</span><strong id="topStudy">— / —</strong></div>
+      <div class="compare-stat"><span>Workout</span><strong id="topWorkout">— / —</strong></div>
+      <div class="compare-stat"><span>Points</span><strong id="topPoints">— / —</strong></div>
+      <div class="compare-stat"><span>Streak</span><strong id="topStreak">— / —</strong></div>
+    </section>
+
+    {% block content %}{% endblock %}
+
+    <nav class="mobile-nav glass-panel" aria-label="Mobile navigation">
+      <a href="/" class="{% if page == 'home' %}active{% endif %}">⌂<small>Home</small></a>
+      <a href="/education" class="{% if page == 'education' %}active{% endif %}">📚<small>Study</small></a>
+      <a href="/projects" class="{% if page == 'projects' %}active{% endif %}">🧪<small>Build</small></a>
+      <a href="/leaderboard" class="{% if page == 'leaderboard' %}active{% endif %}">🏆<small>Rank</small></a>
+      <a href="/settings" class="{% if page == 'settings' %}active{% endif %}">⚙<small>Settings</small></a>
+    </nav>
+  </main>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="modalRoot"></div>
+<script>window.DUO_CONFIG = {page: {{ page|tojson }}, customTabId: {{ (tab.id if tab is defined else none)|tojson }}, projectId: {{ (project.id if project is defined else none)|tojson }}};</script>
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

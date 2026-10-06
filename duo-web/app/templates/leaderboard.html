@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Leaderboard{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">LEADERBOARD / FRIENDLY COMPETITION</span><h1>The scoreboard has opinions.</h1><p>Weekly points are the main race. All-time points show the long game, while streaks reward showing up repeatedly.</p></div><a class="secondary-btn" href="/api/export.csv">Export CSV ↓</a></div>
+<section class="leaderboard-hero glass-panel"><div class="podium" id="podium"></div></section>
+<section class="leaderboard-table glass-panel"><div class="section-title"><div><span class="mono-label">RANKINGS</span><h2>Weekly + all-time</h2></div><span class="tiny-note">study 1/min · workout 1/min · task 25</span></div><div id="leaderboardRows"></div></section>
+<section class="wide-card glass-panel chart-card"><div class="section-title"><div><span class="mono-label">POINTS OVER TIME</span><h2>Daily points</h2></div><span class="tiny-note">last 14 days</span></div><canvas id="pointsChart" height="110"></canvas></section>
+{% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><script src="/static/js/leaderboard.js"></script>{% endblock %}

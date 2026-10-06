@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head project-detail-head"><div><a class="back-link" href="/projects">← Projects</a><div class="detail-title-row"><span class="project-large-icon">{{ project.icon }}</span><div><span class="mono-label">PROJECT FILE</span><h1>{{ project.name }}</h1></div></div><p>{{ project.aim }}</p></div><button class="secondary-btn" id="detailRefresh">Refresh</button></div>
+<section class="project-progress glass-panel"><div><span class="mono-label">COMPLETION</span><strong id="projectProgressValue">0%</strong></div><div class="progress-track"><span id="projectProgressFill"></span></div><span class="tiny-note">completed missions ÷ total missions</span></section>
+<section class="duo-project-stats" id="projectPlayerStats"></section>
+<div class="detail-grid">
+  <section class="wide-card glass-panel"><div class="section-title"><div><span class="mono-label">MISSIONS</span><h2>Checklist</h2></div><button class="small-primary" id="addTaskButton">＋ Add mission</button></div><div id="taskList" class="task-list"></div></section>
+  <section class="wide-card glass-panel"><div class="section-title"><div><span class="mono-label">DAILY PROGRESS NOTES</span><h2>What moved today?</h2></div></div><div id="notesList" class="notes-list"></div><div id="noteForms" class="note-form-grid"></div></section>
+</div>
+<div id="taskModal" class="modal-shell" hidden></div>
+{% endblock %}
+{% block scripts %}<script>window.DUO_PROJECT_ID={{ project.id }};</script><script src="/static/js/project-detail.js"></script>{% endblock %}

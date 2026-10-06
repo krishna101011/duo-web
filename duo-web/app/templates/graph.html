@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Graph{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">GRAPH / OBSIDIAN-STYLE MAP</span><h1>Your progress <span class="gradient-text">ecosystem.</span></h1><p>Projects, missions, study subjects, and activities become a draggable network. Each player gets a distinct visual identity.</p></div><span class="status-chip">drag · zoom · explore</span></div>
+<section class="graph-card glass-panel"><div id="networkGraph" aria-label="Duo Tracker relationship graph"></div><div class="graph-legend"><span><i class="dot player-dot"></i> Players</span><span><i class="dot project-dot"></i> Projects</span><span><i class="dot task-dot"></i> Tasks</span><span><i class="dot subject-dot"></i> Subjects</span><span><i class="dot activity-dot"></i> Activities</span></div></section>
+{% endblock %}
+{% block scripts %}<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script><script src="/static/js/graph.js"></script>{% endblock %}

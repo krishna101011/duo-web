@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Home{% endblock %}
+{% block content %}
+<div class="page-head home-head">
+  <div>
+    <span class="mono-label">HOME / DAILY COMMAND CENTER</span>
+    <h1>Win the day.<br><span class="gradient-text">Then beat your friend.</span></h1>
+    <p>A shared self-improvement cockpit where consistency earns points, progress stays visible, and the leaderboard has just enough spice.</p>
+  </div>
+  <div class="page-actions"><button class="primary-btn" data-action="background">Customize canvas ✦</button><a class="secondary-btn" href="/graph">Open graph ↗</a></div>
+</div>
+
+<section class="rivalry-banner glass-panel">
+  <div><span class="rivalry-kicker">FRIENDLY COMPETITION</span><strong id="homeRivalry">Loading today's rivalry…</strong><small id="rivalrySource">Template fallback is always available.</small></div>
+  <span class="rivalry-spark">⚔️</span>
+</section>
+
+<section class="metric-grid">
+  <div class="metric-card glass-panel span-8">
+    <div class="section-title"><div><span class="mono-label">TODAY'S COMPARISON</span><h2>Same mission · different pace</h2></div><span class="tiny-note">live from SQLite</span></div>
+    <div class="comparison-grid" id="homeComparison"></div>
+  </div>
+  <div class="focus-card glass-panel span-4">
+    <span class="mono-label">DAILY FOCUS</span>
+    <div class="focus-number">04<span>/06 habits</span></div>
+    <p>Two habits are still open. The scoreboard is watching. 👀</p>
+    <div class="focus-ring"><span>76%</span></div>
+    <span class="tag">streak · <b id="homeBestStreak">—</b> days</span>
+  </div>
+</section>
+
+<section class="tabs-section">
+  <div class="section-title"><div><span class="mono-label">YOUR TABS</span><h2>Choose an arena</h2></div><span class="tiny-note">tap a card to enter</span></div>
+  <div class="tab-grid">
+    <a class="tab-card glass-panel education" href="/education"><span class="tab-icon">📚</span><span class="arrow">↗</span><h3>Education</h3><p>Study sessions, reading streaks, notes, and learning points.</p><div class="tab-foot"><span class="tag">time + notes</span><span class="tag" id="educationMeta">loading</span></div><i></i></a>
+    <a class="tab-card glass-panel fitness" href="/fitness"><span class="tab-icon">🏃</span><span class="arrow">↗</span><h3>Fitness</h3><p>Log the activity and duration. Nothing more complicated.</p><div class="tab-foot"><span class="tag">duration</span><span class="tag" id="fitnessMeta">loading</span></div><i></i></a>
+    <a class="tab-card glass-panel projects" href="/projects"><span class="tab-icon">🧪</span><span class="arrow">↗</span><h3>Projects</h3><p>Missions, aims, progress notes, and finish lines that move.</p><div class="tab-foot"><span class="tag">checklist</span><span class="tag" id="projectMeta">loading</span></div><i></i></a>
+    <a class="tab-card glass-panel leaderboard" href="/leaderboard"><span class="tab-icon">🏆</span><span class="arrow">↗</span><h3>Leaderboard</h3><p>Weekly points, all-time totals, streaks, and tiny bragging rights.</p><div class="tab-foot"><span class="tag">weekly + all-time</span><span class="tag">live</span></div><i></i></a>
+    {% for tab in custom_tabs %}
+      <a class="tab-card glass-panel custom-tab" href="/tabs/{{ tab.id }}"><span class="tab-icon">{{ tab.icon }}</span><span class="arrow">↗</span><h3>{{ tab.name }}</h3><p>Custom tracker · {{ tab.tracking_type }}</p><div class="tab-foot"><span class="tag">custom</span></div><i></i></a>
+    {% endfor %}
+    <button class="tab-card glass-panel create-card" data-action="create-tab"><span class="plus">＋</span><strong>Create New Tab</strong><span>time log · checklist · notes · counter</span></button>
+  </div>
+</section>
+
+<section class="quick-ai glass-panel">
+  <div><span class="mono-label">OPTIONAL AI COMPANION</span><h2>One little nudge can change the session.</h2><p>Use your configured provider slots for a daily recap or three study suggestions. No key? The regular app still works.</p></div>
+  <div class="ai-buttons"><button class="secondary-btn" data-ai="summary">Daily recap</button><button class="secondary-btn" data-ai="suggestions">Study suggestions</button></div>
+  <div id="aiResult" class="ai-result" hidden></div>
+</section>
+
+{% endblock %}
+{% block scripts %}<script src="/static/js/home.js"></script>{% endblock %}

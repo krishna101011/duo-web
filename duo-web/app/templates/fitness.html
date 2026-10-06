@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Fitness{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">PHYSICAL ACTIVITY / SIMPLE LOG</span><h1>Move. Log. Done.</h1><p>Only the useful fields: activity and duration. The app rolls the minutes into points and streak calculations automatically.</p></div></div>
+<div class="duo-columns" id="fitnessColumns"></div>
+<section class="wide-card glass-panel chart-card"><div class="section-title"><div><span class="mono-label">LAST 14 DAYS</span><h2>Workout minutes overlay</h2></div><span class="tiny-note">minutes / day</span></div><canvas id="workoutChart" height="110"></canvas></section>
+{% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><script src="/static/js/fitness.js"></script>{% endblock %}

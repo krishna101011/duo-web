@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · {{ tab.name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">CUSTOM TAB / {{ tab.tracking_type|upper }}</span><h1>{{ tab.icon }} {{ tab.name }}</h1><p>A custom tracker shared by both players. The tracking type controls how entries are presented.</p></div></div>
+<section class="duo-columns" id="customColumns"></section>
+{% endblock %}
+{% block scripts %}<script src="/static/js/custom-tab.js"></script>{% endblock %}

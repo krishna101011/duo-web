@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Settings{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="mono-label">SETTINGS / CONTROL ROOM</span><h1>Configure the cockpit.</h1><p>AI keys are encrypted server-side and only masked values are ever returned to the browser. Provider slots fail over in order.</p></div></div>
+<div class="settings-grid">
+  <section class="wide-card glass-panel"><div class="section-title"><div><span class="mono-label">AI PROVIDERS</span><h2>Three-slot failover chain</h2></div><span class="tag">1 → 2 → 3</span></div><div id="aiSlots" class="ai-slots"></div><button class="primary-btn full-btn" id="failoverTest">Test failover · simulate slot 1 failure</button><div id="failoverResult" class="inline-result"></div></section>
+  <section class="wide-card glass-panel"><div class="section-title"><div><span class="mono-label">APPEARANCE</span><h2>Soft Glass controls</h2></div></div><div class="setting-group"><label>Theme</label><div class="segmented"><button data-theme-value="glass" class="active">Soft Glass</button><button data-theme-value="dark">Dark Glass</button></div></div><div class="setting-group"><label>Background</label><div class="background-choices"><button data-bg="aurora"><span class="preview-bg aurora-bg"></span> Aurora</button><button data-bg="sunset"><span class="preview-bg sunset-bg"></span> Sunset</button><button data-bg="ocean"><span class="preview-bg ocean-bg"></span> Ocean</button><button data-bg="solid"><input type="color" id="solidBg" value="#eef3f8"> Solid</button></div></div><div class="setting-group"><label>Background image</label><input id="settingsBgUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div></section>
+</div>
+<section class="wide-card glass-panel security-note"><span>🔐</span><div><strong>Security model</strong><p>API keys are stored encrypted in SQLite using a key derived from <code>APP_SECRET_KEY</code>. They are never embedded in templates, JSON responses, or client-side JavaScript.</p></div></section>
+{% endblock %}
+{% block scripts %}<script src="/static/js/settings.js"></script>{% endblock %}
