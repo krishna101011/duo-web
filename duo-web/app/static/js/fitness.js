@@ -5,7 +5,7 @@ function fitnessForm(player) {
 }
 
 function fitnessCard(player) {
-  const entries = player.entries.length ? player.entries.map(entry => `<div class="entry-row"><div><strong>${escapeHtml(entry.activity)}</strong><small>${entry.day}</small></div><span class="entry-value">${entry.duration_minutes}m</span></div>`).join('') : '<div class="empty-state">No activity logged yet.</div>';
+  const entries = player.entries.length ? player.entries.map(entry => `<div class="entry-row" data-entry-id="${entry.id}"><div><strong>${escapeHtml(entry.activity)}</strong><small>${entry.day}</small></div><div class="entry-row-actions"><span class="entry-value">${entry.duration_minutes}m</span><button class="entry-delete-btn" data-entry-id="${entry.id}" title="Delete" aria-label="Delete">🗑</button></div></div>`).join('') : '<div class="empty-state">No activity logged yet.</div>';
   return `<article class="duo-player-card glass-panel ${player.player_id === 2 ? 'player-2-card':''}">
     <div class="duo-card-head"><div><span class="mono-label">PLAYER ${String(player.player_id).padStart(2,'0')}</span><h2>${escapeHtml(player.name)}</h2></div><span class="player-badge">🏃</span></div>
     <div class="card-stat-row"><div class="stat-box"><span>Today</span><strong>${player.today_minutes}m</strong></div><div class="stat-box"><span>Logs</span><strong>${player.entries.length}</strong></div><div class="stat-box"><span>Points</span><strong>${player.today_minutes}</strong></div></div>
@@ -20,6 +20,17 @@ async function loadFitness() {
     event.preventDefault(); const fd = new FormData(form);
     try { await Duo.api('/api/fitness', { method:'POST', body:JSON.stringify({ player_id:Number(form.dataset.playerId), activity:fd.get('activity'), duration_minutes:Number(fd.get('duration_minutes')) }) }); Duo.toast('Activity logged.'); await refreshFitness(); } catch(e){ Duo.toast(e.message); }
   }));
+  // Delete entry buttons
+  document.querySelectorAll('.entry-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this activity entry?')) return;
+      try {
+        await Duo.api(`/api/fitness/${btn.dataset.entryId}`, { method: 'DELETE' });
+        Duo.toast('Activity deleted.');
+        await refreshFitness();
+      } catch (e) { Duo.toast(e.message); }
+    });
+  });
 }
 
 async function renderWorkoutChart() {

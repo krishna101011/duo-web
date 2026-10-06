@@ -9,7 +9,7 @@ function studyForm(player) {
 }
 
 function educationCard(player) {
-  const entries = player.entries.length ? player.entries.map(entry => `<div class="entry-row"><div><strong>${escapeHtml(entry.subject)}</strong><small>${escapeHtml(entry.notes || 'No notes')} · ${entry.day}</small></div><span class="entry-value">note</span></div>`).join('') : '<div class="empty-state">No study entries yet.</div>';
+  const entries = player.entries.length ? player.entries.map(entry => `<div class="entry-row" data-entry-id="${entry.id}" data-player-id="${player.player_id}"><div><strong>${escapeHtml(entry.subject)}</strong><small>${escapeHtml(entry.notes || 'No notes')} · ${entry.day}</small></div><div class="entry-row-actions"><span class="entry-value">note</span><button class="entry-delete-btn" data-entry-id="${entry.id}" title="Delete entry" aria-label="Delete">🗑</button></div></div>`).join('') : '<div class="empty-state">No study entries yet.</div>';
   return `<article class="duo-player-card glass-panel ${player.player_id === 2 ? 'player-2-card':''}">
     <div class="duo-card-head"><div><span class="mono-label">PLAYER ${String(player.player_id).padStart(2,'0')}</span><h2>${escapeHtml(player.name)}</h2></div><span class="player-badge">📚</span></div>
     <div class="card-stat-row"><div class="stat-box"><span>Today</span><strong>${player.today_minutes}m</strong></div><div class="stat-box"><span>Entries</span><strong>${player.entries.length}</strong></div><div class="stat-box"><span>Unit</span><strong>1:1</strong></div></div>
@@ -29,6 +29,17 @@ async function loadEducation() {
       Duo.toast('Study entry posted.'); await refreshEducation();
     } catch (e) { Duo.toast(e.message); }
   }));
+  // Delete entry buttons
+  document.querySelectorAll('.entry-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this study entry?')) return;
+      try {
+        await Duo.api(`/api/education/entries/${btn.dataset.entryId}`, { method: 'DELETE' });
+        Duo.toast('Entry deleted.');
+        await refreshEducation();
+      } catch (e) { Duo.toast(e.message); }
+    });
+  });
   renderStudyTotal(data.players);
 }
 

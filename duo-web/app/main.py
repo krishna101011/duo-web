@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
@@ -19,6 +19,11 @@ app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 app.include_router(pages.router)
 app.include_router(api.router)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_root():
+    return RedirectResponse(url="/static/favicon.svg", status_code=301)
 
 
 @app.on_event("startup")

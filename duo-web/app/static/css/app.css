@@ -361,3 +361,74 @@ canvas { max-height: 230px; }
   .mobile-nav { display:grid; grid-template-columns:repeat(5,1fr); position:sticky; bottom:9px; z-index:25; padding:5px; margin-top:13px; }
   .mobile-nav a { display:grid; place-items:center; gap:1px; padding:7px 4px; border-radius:11px; color:var(--muted); font-size:14px; }.mobile-nav a.active { background:color-mix(in srgb,var(--accent) 10%,transparent); color:var(--text); }.mobile-nav small { font-size:7px; }
 }
+
+/* ─── Settings sections (new) ─────────────────────────────────────────────── */
+.settings-section { padding:17px; margin-top:13px; }
+.settings-section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.settings-section-head h2 { margin:4px 0 0; font-size:15px; }
+
+/* ─── Players Management ─────────────────────────────────────────────────── */
+.players-management { display:grid; gap:10px; }
+.player-management-row { display:grid; grid-template-columns:48px minmax(0,1fr) auto; gap:12px; align-items:center; padding:12px; border:1px solid var(--line); border-radius:16px; background:var(--surface-soft); }
+.player-mgmt-avatar { width:48px; height:48px; border-radius:14px; overflow:hidden; display:grid; place-items:center; border:1px solid var(--line); background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,transparent),color-mix(in srgb,var(--hot) 12%,transparent)); font-size:21px; }
+.player-mgmt-avatar img { width:100%; height:100%; object-fit:cover; }
+.player-mgmt-info { display:flex; flex-direction:column; gap:3px; }
+.player-mgmt-info strong { font-size:12px; }
+.player-mgmt-actions { display:flex; gap:6px; flex-wrap:wrap; }
+
+/* ─── Tab Management ─────────────────────────────────────────────────────── */
+.tabs-management { display:grid; gap:9px; }
+.tab-management-row { display:grid; grid-template-columns:36px minmax(0,1fr) auto; gap:12px; align-items:center; padding:11px 13px; border:1px solid var(--line); border-radius:14px; background:var(--surface-soft); }
+.tab-mgmt-icon { font-size:20px; text-align:center; }
+.tab-mgmt-info { display:flex; align-items:center; gap:8px; }
+.tab-mgmt-info strong { font-size:11px; }
+.tab-mgmt-actions { display:flex; gap:6px; flex-wrap:wrap; }
+
+/* ─── Data Actions Grid ──────────────────────────────────────────────────── */
+.data-actions-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+.data-action-card { display:flex; align-items:center; gap:12px; padding:13px; border:1px solid var(--line); border-radius:15px; background:var(--surface-soft); }
+.data-action-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; border:1px solid var(--line); background:var(--surface); font-size:18px; flex:0 0 40px; }
+.data-action-card > div { flex:1; min-width:0; }
+.data-action-card strong { font-size:11px; }
+.data-action-card p { margin:3px 0 0; color:var(--muted); font-size:9px; line-height:1.5; }
+
+/* ─── Backups ────────────────────────────────────────────────────────────── */
+.backups-list { display:grid; gap:8px; }
+.backup-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding:11px 13px; border:1px solid var(--line); border-radius:14px; background:var(--surface-soft); }
+.backup-info strong { font-size:10px; }
+.backup-actions { display:flex; gap:6px; }
+
+/* ─── Danger Zone ────────────────────────────────────────────────────────── */
+.danger-zone { border-color:color-mix(in srgb,var(--danger) 30%,var(--line)); background:color-mix(in srgb,var(--danger) 4%,var(--surface)); }
+.danger-label { color:var(--danger) !important; }
+.danger-description { color:var(--muted); font-size:10px; line-height:1.6; margin:0 0 13px; }
+.danger-actions { display:grid; gap:9px; }
+.danger-action { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px; border:1px solid color-mix(in srgb,var(--danger) 22%,var(--line)); border-radius:14px; background:color-mix(in srgb,var(--danger) 5%,var(--surface-soft)); }
+.danger-action > div { flex:1; min-width:0; }
+.danger-action strong { font-size:11px; }
+.danger-action p { margin:3px 0 0; color:var(--muted); font-size:9px; line-height:1.55; }
+.danger-btn { border-radius:13px; padding:10px 14px; border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line)); font-size:10px; font-weight:700; color:var(--danger); background:color-mix(in srgb,var(--danger) 10%,var(--surface)); transition:.18s ease; white-space:nowrap; }
+.danger-btn:hover { background:var(--danger); color:white; transform:translateY(-2px); }
+.danger-btn:disabled { opacity:.45; pointer-events:none; }
+.danger-text { color:var(--danger); }
+
+/* ─── Confirm modal body ─────────────────────────────────────────────────── */
+.confirm-body { padding:10px; border-radius:13px; background:var(--surface-soft); margin:10px 0; font-size:10px; line-height:1.65; color:var(--muted); }
+.warning-body { border:1px solid color-mix(in srgb,var(--danger) 22%,var(--line)); background:color-mix(in srgb,var(--danger) 5%,var(--surface-soft)); }
+.confirm-body p { margin:0 0 6px; }
+.confirm-body ul { margin:4px 0; padding-left:16px; }
+.confirm-body strong { color:var(--text); }
+
+/* ─── Entry delete button ────────────────────────────────────────────────── */
+.entry-row { grid-template-columns:1fr auto; }
+.entry-row-actions { display:flex; align-items:center; gap:7px; }
+.entry-delete-btn { width:26px; height:26px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--muted); font-size:12px; padding:0; transition:.16s ease; display:grid; place-items:center; }
+.entry-delete-btn:hover { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 40%,var(--line)); background:color-mix(in srgb,var(--danger) 8%,transparent); }
+
+@media (max-width:920px) {
+  .data-actions-grid { grid-template-columns:1fr; }
+  .danger-action { flex-direction:column; align-items:flex-start; }
+  .player-management-row { grid-template-columns:48px 1fr; }
+  .player-mgmt-actions { grid-column:1 / -1; }
+}
+

@@ -3,19 +3,21 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
 import os
+import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..db import SessionLocal
+from ..db import SessionLocal, engine
 from ..models import (
     AIKeySlot,
     ActivityLog,
@@ -34,8 +36,10 @@ from ..schemas import (
     AIKeyUpdate,
     ActivityCreate,
     BackgroundUpdate,
+    ConfirmReset,
     CustomEntryCreate,
     CustomTabCreate,
+    CustomTabUpdate,
     PlayerUpdate,
     ProjectCreate,
     ProjectNoteCreate,
@@ -45,6 +49,18 @@ from ..schemas import (
     TaskToggle,
 )
 from ..services.ai_client import AIClientManager
+from ..services.backup import create_backup, delete_backup, list_backups, restore_backup
+from ..services.data_management import (
+    clear_history,
+    delete_activity_entry,
+    delete_study_entry,
+    delete_tab,
+    rename_tab,
+    reset_all_data,
+    reset_player_score,
+    reset_scores,
+    export_json,
+)
 from ..services.rivalry import fallback_rivalry
 from ..services.scoring import TASK_POINTS, get_daily_stats, streak_days, total_points, add_points
 from ..services.security import decrypt_secret, mask_secret
@@ -53,6 +69,15 @@ router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+# Resolve the DB file path from DATABASE_URL (works for sqlite:///./path style)
+def _db_file_path() -> Path:
+    url = settings.DATABASE_URL
+    if url.startswith("sqlite:///./"):
+        return settings.BACKUP_DIR / url[len("sqlite:///./"):]
+    if url.startswith("sqlite:///"):
+        return Path(url[len("sqlite:///"):])
+    return settings.BACKUP_DIR / "duo_tracker.db"
 
 
 def get_db() -> Session:
@@ -111,6 +136,19 @@ def project_payload(db: Session, project: Project) -> dict:
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Favicon (fixes browser 404)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return RedirectResponse(url="/static/favicon.svg", status_code=301)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Application state
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get("/state")
 def state():
     with get_db() as db:
@@ -145,6 +183,10 @@ def state():
         }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Players
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.patch("/players/{player_id}")
 def update_player(player_id: int, payload: PlayerUpdate):
     with get_db() as db:
@@ -177,6 +219,35 @@ def upload_avatar(player_id: int, file: UploadFile = File(...)):
         safe_commit(db)
         return {"ok": True, "avatar_path": player.avatar_path}
 
+
+@router.get("/players/{player_id}/stats")
+def player_stats(player_id: int):
+    """Detailed statistics for a single player."""
+    with get_db() as db:
+        player = db.get(Player, player_id)
+        if not player:
+            raise HTTPException(404, "Player not found.")
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        study_count = db.scalar(select(func.count(StudyEntry.id)).where(StudyEntry.player_id == player_id)) or 0
+        activity_count = db.scalar(select(func.count(ActivityLog.id)).where(ActivityLog.player_id == player_id)) or 0
+        return {
+            "id": player.id,
+            "name": player.name,
+            "emoji": player.emoji,
+            "all_time_points": total_points(db, player.id),
+            "weekly_points": total_points(db, player.id, week_start, today),
+            "today_points": total_points(db, player.id, today, today),
+            "streak": streak_days(db, player.id),
+            "study_entries": study_count,
+            "activity_entries": activity_count,
+            "total_activities": study_count + activity_count,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Background
+# ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/background")
 def update_background(payload: BackgroundUpdate):
@@ -212,6 +283,10 @@ def upload_background(file: UploadFile = File(...)):
     return {"ok": True, "background_value": f"/uploads/{filename}"}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Education
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get("/education")
 def education_data():
     with get_db() as db:
@@ -239,6 +314,21 @@ def add_study(payload: StudyCreate):
         return {"ok": True, "entry_id": entry.id}
 
 
+@router.delete("/education/entries/{entry_id}")
+def delete_study_entry_route(entry_id: int):
+    with get_db() as db:
+        try:
+            delete_study_entry(db, entry_id)
+            safe_commit(db)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to delete study entry %s: %s", entry_id, exc)
+            raise HTTPException(500, "Unable to delete the entry. Your data was not changed.") from exc
+    return {"ok": True}
+
+
 @router.put("/education/today")
 def update_study_minutes(payload: StudyMinutesUpdate):
     with get_db() as db:
@@ -252,6 +342,10 @@ def update_study_minutes(payload: StudyMinutesUpdate):
         safe_commit(db)
         return {"ok": True, "today_minutes": stats.study_minutes}
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fitness
+# ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/fitness")
 def fitness_data():
@@ -281,6 +375,25 @@ def add_activity(payload: ActivityCreate):
         safe_commit(db)
         return {"ok": True, "entry_id": log.id}
 
+
+@router.delete("/fitness/{entry_id}")
+def delete_activity_entry_route(entry_id: int):
+    with get_db() as db:
+        try:
+            delete_activity_entry(db, entry_id)
+            safe_commit(db)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to delete activity entry %s: %s", entry_id, exc)
+            raise HTTPException(500, "Unable to delete the activity. Your data was not changed.") from exc
+    return {"ok": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Projects
+# ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/projects")
 def project_list():
@@ -351,6 +464,10 @@ def add_project_note(project_id: int, payload: ProjectNoteCreate):
         return {"ok": True, "note_id": note.id}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Custom Tabs
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.post("/custom-tabs")
 def create_custom_tab(payload: CustomTabCreate):
     with get_db() as db:
@@ -360,6 +477,33 @@ def create_custom_tab(payload: CustomTabCreate):
         db.add(tab)
         safe_commit(db)
         return {"ok": True, "tab": {"id": tab.id, "name": tab.name, "icon": tab.icon, "tracking_type": tab.tracking_type}}
+
+
+@router.patch("/custom-tabs/{tab_id}")
+def update_custom_tab(tab_id: int, payload: CustomTabUpdate):
+    with get_db() as db:
+        try:
+            rename_tab(db, tab_id, payload.name, payload.icon)
+            safe_commit(db)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        tab = db.get(CustomTab, tab_id)
+        return {"ok": True, "tab": {"id": tab.id, "name": tab.name, "icon": tab.icon}}
+
+
+@router.delete("/custom-tabs/{tab_id}")
+def delete_custom_tab(tab_id: int):
+    with get_db() as db:
+        try:
+            name = delete_tab(db, tab_id)
+            safe_commit(db)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to delete custom tab %s: %s", tab_id, exc)
+            raise HTTPException(500, "Unable to delete the tab. Your data was not changed.") from exc
+    return {"ok": True, "name": name}
 
 
 @router.get("/custom-tabs/{tab_id}")
@@ -386,6 +530,10 @@ def add_custom_entry(tab_id: int, payload: CustomEntryCreate):
         return {"ok": True, "entry_id": entry.id}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Leaderboard & Charts
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get("/leaderboard")
 def leaderboard_data():
     today = date.today()
@@ -393,6 +541,8 @@ def leaderboard_data():
     with get_db() as db:
         result = []
         for p in db.scalars(select(Player).order_by(Player.id)).all():
+            study_count = db.scalar(select(func.count(StudyEntry.id)).where(StudyEntry.player_id == p.id)) or 0
+            activity_count = db.scalar(select(func.count(ActivityLog.id)).where(ActivityLog.player_id == p.id)) or 0
             result.append({
                 "id": p.id,
                 "name": p.name,
@@ -401,6 +551,7 @@ def leaderboard_data():
                 "weekly": total_points(db, p.id, week_start, today),
                 "today": total_points(db, p.id, today, today),
                 "streak": streak_days(db, p.id),
+                "total_activities": study_count + activity_count,
             })
         result.sort(key=lambda x: x["weekly"], reverse=True)
         for index, row in enumerate(result, 1):
@@ -471,6 +622,10 @@ def graph_data():
         return {"nodes": nodes, "edges": edges}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# AI
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get("/rivalry")
 def rivalry_data(ai: bool = True):
     with get_db() as db:
@@ -514,6 +669,10 @@ def ai_summary(kind: str = "summary"):
         except Exception as exc:
             return JSONResponse(status_code=503, content={"ok": False, "message": "AI is not configured or is temporarily unavailable. Configure a key in Settings.", "error_type": type(exc).__name__})
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Settings
+# ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/settings/ai")
 def ai_settings():
@@ -566,6 +725,140 @@ def test_ai_failover():
         return {"ok": ok, "message": message, "used_slot": used_slot}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Data Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/data/reset-player/{player_id}")
+def reset_player_score_route(player_id: int):
+    with get_db() as db:
+        try:
+            reset_player_score(db, player_id)
+            safe_commit(db)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to reset player score %s: %s", player_id, exc)
+            raise HTTPException(500, "Unable to reset the player score. Your data was not changed.") from exc
+    return {"ok": True}
+
+
+@router.post("/data/clear-history")
+def clear_history_route():
+    with get_db() as db:
+        try:
+            clear_history(db)
+            safe_commit(db)
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to clear history: %s", exc)
+            raise HTTPException(500, "Unable to clear history. Your data was not changed.") from exc
+    return {"ok": True}
+
+
+@router.post("/data/reset-scores")
+def reset_scores_route():
+    with get_db() as db:
+        try:
+            reset_scores(db)
+            safe_commit(db)
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to reset scores: %s", exc)
+            raise HTTPException(500, "Unable to reset scores. Your data was not changed.") from exc
+    return {"ok": True}
+
+
+@router.post("/data/reset-all")
+def reset_all_route(payload: ConfirmReset):
+    if payload.confirmation != "RESET":
+        raise HTTPException(400, "Confirmation text must be exactly 'RESET'.")
+    # Create a backup before destroying data
+    backup_filename: str | None = None
+    db_path = _db_file_path()
+    try:
+        backup_filename = create_backup(db_path, settings.BACKUP_DIR)
+        logger.info("Pre-reset backup created: %s", backup_filename)
+    except Exception as exc:
+        logger.warning("Could not create pre-reset backup: %s", exc)
+
+    with get_db() as db:
+        try:
+            reset_all_data(db)
+            safe_commit(db)
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Failed to reset all data: %s", exc)
+            raise HTTPException(500, "Unable to reset data. Your data was not changed.") from exc
+    return {"ok": True, "backup_created": backup_filename}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Backups
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/data/backups")
+def list_backups_route():
+    try:
+        backups = list_backups(settings.BACKUP_DIR)
+    except Exception as exc:
+        logger.exception("Failed to list backups: %s", exc)
+        raise HTTPException(500, "Unable to list backups.") from exc
+    return {"backups": backups}
+
+
+@router.post("/data/backup")
+def create_backup_route():
+    db_path = _db_file_path()
+    try:
+        filename = create_backup(db_path, settings.BACKUP_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Database file not found.") from exc
+    except Exception as exc:
+        logger.exception("Failed to create backup: %s", exc)
+        raise HTTPException(500, "Unable to create backup.") from exc
+    return {"ok": True, "filename": filename}
+
+
+@router.post("/data/restore/{filename}")
+def restore_backup_route(filename: str):
+    # Prevent directory traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid backup filename.")
+    db_path = _db_file_path()
+    try:
+        restore_backup(filename, db_path, settings.BACKUP_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Backup file not found.") from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to restore backup %s: %s", filename, exc)
+        raise HTTPException(500, "Unable to restore backup. The database was not modified.") from exc
+    # Dispose engine connection pool so next request uses the freshly restored file
+    engine.dispose()
+    return {"ok": True, "message": "Backup restored. Please refresh the application."}
+
+
+@router.delete("/data/backups/{filename}")
+def delete_backup_route(filename: str):
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(400, "Invalid backup filename.")
+    try:
+        delete_backup(filename, settings.BACKUP_DIR)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Backup file not found.") from exc
+    except Exception as exc:
+        logger.exception("Failed to delete backup %s: %s", filename, exc)
+        raise HTTPException(500, "Unable to delete backup.") from exc
+    return {"ok": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Export / Import
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get("/export.csv")
 def export_csv():
     with get_db() as db:
@@ -582,3 +875,12 @@ def export_csv():
         output.seek(0)
         headers = {"Content-Disposition": 'attachment; filename="duo_tracker_export.csv"'}
         return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
+
+@router.get("/export.json")
+def export_json_route():
+    with get_db() as db:
+        data = export_json(db)
+    json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    headers = {"Content-Disposition": 'attachment; filename="duo_tracker_export.json"'}
+    return StreamingResponse(iter([json_bytes]), media_type="application/json", headers=headers)

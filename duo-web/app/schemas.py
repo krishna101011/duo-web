@@ -56,6 +56,11 @@ class CustomTabCreate(BaseModel):
     created_by: int | None = None
 
 
+class CustomTabUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    icon: str | None = Field(default=None, max_length=8)
+
+
 class CustomEntryCreate(BaseModel):
     player_id: int
     label: str = Field(default="Entry", max_length=160)
@@ -75,3 +80,8 @@ class AIKeyUpdate(BaseModel):
     model: str = Field(min_length=1, max_length=120)
     key: str | None = Field(default=None, max_length=1000)
     enabled: bool = True
+
+
+class ConfirmReset(BaseModel):
+    """Requires the user to type RESET to confirm a destructive operation."""
+    confirmation: str = Field(min_length=1, max_length=20)

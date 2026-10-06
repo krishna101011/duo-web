@@ -1,11 +1,125 @@
 {% extends "base.html" %}
 {% block title %}Duo Tracker · Settings{% endblock %}
 {% block content %}
-<div class="page-head"><div><span class="mono-label">SETTINGS / CONTROL ROOM</span><h1>Configure the cockpit.</h1><p>AI keys are encrypted server-side and only masked values are ever returned to the browser. Provider slots fail over in order.</p></div></div>
-<div class="settings-grid">
-  <section class="wide-card glass-panel"><div class="section-title"><div><span class="mono-label">AI PROVIDERS</span><h2>Three-slot failover chain</h2></div><span class="tag">1 → 2 → 3</span></div><div id="aiSlots" class="ai-slots"></div><button class="primary-btn full-btn" id="failoverTest">Test failover · simulate slot 1 failure</button><div id="failoverResult" class="inline-result"></div></section>
-  <section class="wide-card glass-panel"><div class="section-title"><div><span class="mono-label">APPEARANCE</span><h2>Soft Glass controls</h2></div></div><div class="setting-group"><label>Theme</label><div class="segmented"><button data-theme-value="glass" class="active">Soft Glass</button><button data-theme-value="dark">Dark Glass</button></div></div><div class="setting-group"><label>Background</label><div class="background-choices"><button data-bg="aurora"><span class="preview-bg aurora-bg"></span> Aurora</button><button data-bg="sunset"><span class="preview-bg sunset-bg"></span> Sunset</button><button data-bg="ocean"><span class="preview-bg ocean-bg"></span> Ocean</button><button data-bg="solid"><input type="color" id="solidBg" value="#eef3f8"> Solid</button></div></div><div class="setting-group"><label>Background image</label><input id="settingsBgUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div></section>
+<div class="page-head">
+  <div>
+    <span class="mono-label">SETTINGS / CONTROL ROOM</span>
+    <h1>Configure the cockpit.</h1>
+    <p>Manage AI providers, appearance, players, custom tabs, data, backups, and exports. API keys are encrypted server-side and never returned to the browser.</p>
+  </div>
 </div>
-<section class="wide-card glass-panel security-note"><span>🔐</span><div><strong>Security model</strong><p>API keys are stored encrypted in SQLite using a key derived from <code>APP_SECRET_KEY</code>. They are never embedded in templates, JSON responses, or client-side JavaScript.</p></div></section>
+
+<!-- ── AI PROVIDERS ─────────────────────────────────────────────────────── -->
+<section class="settings-section glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label">AI PROVIDERS</span><h2>Three-slot failover chain</h2></div>
+    <span class="tag">1 → 2 → 3</span>
+  </div>
+  <div id="aiSlots" class="ai-slots"></div>
+  <button class="primary-btn full-btn" id="failoverTest">Test failover · simulate slot 1 failure</button>
+  <div id="failoverResult" class="inline-result"></div>
+</section>
+
+<!-- ── APPEARANCE ────────────────────────────────────────────────────────── -->
+<section class="settings-section glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label">APPEARANCE</span><h2>Soft Glass controls</h2></div>
+  </div>
+  <div class="setting-group">
+    <label>Theme</label>
+    <div class="segmented"><button data-theme-value="glass" class="active">Soft Glass</button><button data-theme-value="dark">Dark Glass</button></div>
+  </div>
+  <div class="setting-group">
+    <label>Background</label>
+    <div class="background-choices">
+      <button data-bg="aurora"><span class="preview-bg aurora-bg"></span> Aurora</button>
+      <button data-bg="sunset"><span class="preview-bg sunset-bg"></span> Sunset</button>
+      <button data-bg="ocean"><span class="preview-bg ocean-bg"></span> Ocean</button>
+      <button data-bg="solid"><input type="color" id="solidBg" value="#eef3f8"> Solid</button>
+    </div>
+  </div>
+  <div class="setting-group">
+    <label>Background image</label>
+    <input id="settingsBgUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+  </div>
+</section>
+
+<!-- ── PLAYERS ───────────────────────────────────────────────────────────── -->
+<section class="settings-section glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label">PLAYERS</span><h2>Player management</h2></div>
+  </div>
+  <div id="playersManagement" class="players-management"></div>
+</section>
+
+<!-- ── CUSTOM TABS ───────────────────────────────────────────────────────── -->
+<section class="settings-section glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label">CUSTOM TABS</span><h2>Your custom trackers</h2></div>
+    <button class="primary-btn" data-action="create-tab">+ Create Tab</button>
+  </div>
+  <div id="tabsManagement" class="tabs-management"></div>
+</section>
+
+<!-- ── DATA MANAGEMENT ───────────────────────────────────────────────────── -->
+<section class="settings-section glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label">DATA MANAGEMENT</span><h2>Export &amp; import your data</h2></div>
+  </div>
+  <div class="data-actions-grid">
+    <div class="data-action-card">
+      <div class="data-action-icon">📤</div>
+      <div><strong>Export CSV</strong><p>Download all study, activity, and project data in spreadsheet format.</p></div>
+      <a class="secondary-btn" href="/api/export.csv">Export CSV ↓</a>
+    </div>
+    <div class="data-action-card">
+      <div class="data-action-icon">📦</div>
+      <div><strong>Export JSON</strong><p>Full application data export. No API keys or secrets included.</p></div>
+      <a class="secondary-btn" href="/api/export.json">Export JSON ↓</a>
+    </div>
+    <div class="data-action-card">
+      <div class="data-action-icon">🧹</div>
+      <div><strong>Clear History</strong><p>Remove all activity records while keeping players, tabs, settings, and AI configuration.</p></div>
+      <button class="secondary-btn" id="clearHistoryBtn">Clear History…</button>
+    </div>
+    <div class="data-action-card">
+      <div class="data-action-icon">🔄</div>
+      <div><strong>Reset Scores</strong><p>Zero out all points and daily stats without deleting entries or configuration.</p></div>
+      <button class="secondary-btn" id="resetScoresBtn">Reset Scores…</button>
+    </div>
+  </div>
+</section>
+
+<!-- ── BACKUPS ───────────────────────────────────────────────────────────── -->
+<section class="settings-section glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label">BACKUPS</span><h2>Database snapshots</h2></div>
+    <button class="primary-btn" id="createBackupBtn">Create Backup</button>
+  </div>
+  <div id="backupsList" class="backups-list"></div>
+</section>
+
+<!-- ── DANGER ZONE ───────────────────────────────────────────────────────── -->
+<section class="settings-section danger-zone glass-panel">
+  <div class="settings-section-head">
+    <div><span class="mono-label danger-label">⚠ DANGER ZONE</span><h2>Irreversible operations</h2></div>
+  </div>
+  <p class="danger-description">These operations are permanent. A database backup is created automatically before a full reset, but exercise caution.</p>
+  <div class="danger-actions">
+    <div class="danger-action">
+      <div>
+        <strong>Reset Duo Tracker</strong>
+        <p>Permanently deletes all scores, history, custom tabs, projects, and activity records. Players (names &amp; avatars) and AI configuration are preserved.</p>
+      </div>
+      <button class="danger-btn" id="fullResetBtn">Reset Duo Tracker…</button>
+    </div>
+  </div>
+</section>
+
+<section class="wide-card glass-panel security-note">
+  <span>🔐</span>
+  <div><strong>Security model</strong><p>API keys are stored encrypted in SQLite using a key derived from <code>APP_SECRET_KEY</code>. They are never embedded in templates, JSON responses, or client-side JavaScript. JSON exports intentionally exclude all AI key data.</p></div>
+</section>
+
 {% endblock %}
 {% block scripts %}<script src="/static/js/settings.js"></script>{% endblock %}

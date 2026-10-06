@@ -31,7 +31,9 @@ class Settings:
     STATIC_DIR = ROOT_DIR / "app" / "static"
     TEMPLATE_DIR = ROOT_DIR / "app" / "templates"
     UPLOAD_DIR = ROOT_DIR / "app" / "uploads"
+    BACKUP_DIR = ROOT_DIR
 
 
 settings = Settings()
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+(settings.BACKUP_DIR / "backups").mkdir(parents=True, exist_ok=True)
