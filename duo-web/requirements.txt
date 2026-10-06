@@ -6,3 +6,4 @@ python-dotenv>=1,<2
 python-multipart>=0.0.20,<1
 cryptography>=44,<48
 openai>=1.90,<3
+psycopg2-binary>=2.9
