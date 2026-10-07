@@ -275,3 +275,27 @@ The core app is local, but Chart.js and vis-network are loaded from CDNs. A rest
 ### Avatar/background upload fails
 
 Use PNG, JPEG, WEBP, or GIF. Avatar files are limited to 5 MB and background uploads to 10 MB.
+
+## 10. Multi-tracker accounts
+
+Duo Tracker is now designed for many independent two-person trackers in one deployment.
+
+### Create your own tracker
+
+On `/signup`, choose **Create new**. After account creation, open **Account & code** to see your six-character Tracker ID.
+
+### Join a friend's tracker
+
+On `/signup`, choose **Join existing**, enter your friend's Tracker ID, and create your account. The tracker accepts at most two accounts.
+
+### Data isolation
+
+Players, projects, custom tabs, backgrounds, AI slots, scores, history, and exports are scoped to the active Tracker ID. A user in Tracker A cannot open Tracker B's project or settings by changing an ID in the URL.
+
+### Saved background loading
+
+The saved background is inserted into the server-rendered HTML before the browser paints the page. Client-side state is cached for the current page, duplicate initial state requests are reused, and the automatic rivalry call uses the fast template path rather than an AI request. This prevents the old background flicker and removes an avoidable external AI delay on page navigation.
+
+### Logout
+
+A **Log out** control is available in the desktop sidebar, the mobile navigation, and the Account page.

@@ -24,3 +24,11 @@
 .hint { font-size: .85rem; color: var(--muted); }
 .auth-form button.primary-btn, .account-card .primary-btn, .account-card .secondary-btn { font-size: .95rem; padding: 13px 18px; cursor: pointer; }
 .account-card .secondary-btn { background: var(--surface-soft); color: var(--text); }
+.signup-mode { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:-4px 0 4px; }
+.mode-option { display:flex; align-items:center; gap:9px; padding:11px 12px; border:1px solid var(--line-strong); border-radius:14px; background:var(--surface-soft); color:var(--text); text-decoration:none; transition:.18s ease; }
+.mode-option:hover { transform:translateY(-1px); border-color:var(--accent); }
+.mode-option.active { border-color:color-mix(in srgb,var(--accent) 48%,var(--line-strong)); background:color-mix(in srgb,var(--accent) 9%,var(--surface-soft)); }
+.mode-option > span { display:grid; gap:2px; min-width:0; }
+.mode-option strong { font-size:.76rem; }
+.mode-option small { color:var(--muted); font-size:.64rem; line-height:1.25; }
+@media (max-width: 520px) { .signup-mode { grid-template-columns:1fr; } }

@@ -39,6 +39,6 @@ async function renderWorkoutChart() {
   const datasets = data.players.map((player,index)=>({label:player.name,data:player.workout,tension:.35,borderWidth:2,fill:false,borderColor:index===0?'#13c8aa':'#ed4db6'}));
   workoutChart = new Chart(ctx,{type:'line',data:{labels:data.labels.map(d=>d.slice(5)),datasets},options:{responsive:true,plugins:{legend:{labels:{color:getComputedStyle(document.body).getPropertyValue('--muted')}}},scales:{x:{ticks:{color:getComputedStyle(document.body).getPropertyValue('--muted')},grid:{color:'rgba(100,110,140,.08)'}},y:{beginAtZero:true,ticks:{color:getComputedStyle(document.body).getPropertyValue('--muted')},grid:{color:'rgba(100,110,140,.08)'}}}}});
 }
-async function refreshFitness(){ await loadFitness(); await renderWorkoutChart(); await Duo.loadState(); }
+async function refreshFitness(){ await loadFitness(); await renderWorkoutChart(); }
 (async function(){ try { await refreshFitness(); } catch(e){ Duo.toast(e.message); } })();
 function escapeHtml(value){ return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }

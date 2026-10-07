@@ -8,7 +8,7 @@ A two-person self-improvement cockpit. Track study time, fitness activities, pro
 
 ## Features
 
-- **Two-player competition** — shared scoreboard, streak tracking, and rivalry banners
+- **Multi-tracker competition** — anyone can create a private two-player tracker or join one with its Tracker ID; each tracker is isolated
 - **Education tracking** — study sessions with subjects, notes, and time tracking
 - **Fitness logging** — activity logs with duration and points
 - **Projects** — shared missions with tasks, progress, and notes
@@ -103,8 +103,9 @@ The database is created automatically on first run with demo data for both playe
 | `AI_DEFAULT_BASE_URL` | `https://api.openai.com/v1` | Seed base URL (first run only) |
 | `AI_DEFAULT_MODEL` | `gpt-4o-mini` | Seed model (first run only) |
 | `AI_DEFAULT_KEY` | _(empty)_ | Seed API key (first run only, stored encrypted) |
+| `ALLOW_GLOBAL_BACKUPS` | `false` | Server-admin switch for database-wide backup management; keep `false` for multi-tracker deployments |
 
-> **Security:** `APP_SECRET_KEY` must be set to a strong value in production. If you change it, existing encrypted API keys become unreadable and must be re-entered in Settings.
+> **Security:** `APP_SECRET_KEY` must be set to a strong value in production. If you change it, existing encrypted API keys become unreadable and must be re-entered in Settings. In multi-tracker mode, keep `ALLOW_GLOBAL_BACKUPS=false` so one tracker member cannot restore or delete another tracker's database snapshot.
 
 ---
 
@@ -139,7 +140,7 @@ Customise with `DATABASE_URL` in `.env`.
 
 ## Data Management
 
-Access all data operations from **Settings → Data Management** and **Settings → Backups**.
+Access tracker-scoped data operations from **Settings → Data Management**. Database-wide SQLite backup management is disabled for normal tracker members in multi-tracker mode.
 
 ### Exports
 
@@ -160,6 +161,8 @@ Access all data operations from **Settings → Data Management** and **Settings 
 
 ### Backups
 
+The automatic safety backup created before a full reset is server-side. Manual database-wide backup/restore/delete controls are disabled by default in multi-tracker mode because a SQLite snapshot contains every tracker in the database. A server administrator can explicitly enable those controls with `ALLOW_GLOBAL_BACKUPS=true`.
+
 Backups are stored in `duo-web/backups/` as timestamped SQLite files:
 
 ```
@@ -168,12 +171,7 @@ backups/
     duo_tracker_backup_20261006_115642.db
 ```
 
-From Settings → Backups you can:
-- **Create** a manual backup at any time
-- **Restore** a backup (overwrites current database)
-- **Delete** old backups
-
-Restoring a backup also requires confirmation.
+When `ALLOW_GLOBAL_BACKUPS=true`, Settings can manage those server-wide snapshots. Keep the setting `false` on a public multi-tracker deployment.
 
 ### Backup / Restore via CLI
 
@@ -235,10 +233,6 @@ The full interactive API documentation is available at:
 | `POST` | `/api/data/reset-scores` | Reset all scores |
 | `POST` | `/api/data/clear-history` | Clear all history |
 | `POST` | `/api/data/reset-all` | Full reset (requires `{"confirmation":"RESET"}`) |
-| `POST` | `/api/data/backup` | Create database backup |
-| `GET` | `/api/data/backups` | List backups |
-| `POST` | `/api/data/restore/{filename}` | Restore a backup |
-| `DELETE` | `/api/data/backups/{filename}` | Delete a backup |
 | `GET` | `/api/export.csv` | Export CSV |
 | `GET` | `/api/export.json` | Export JSON (no API keys) |
 

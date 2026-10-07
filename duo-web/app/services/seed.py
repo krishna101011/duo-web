@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import (
     AIKeySlot,
+    Tracker,
     ActivityLog,
     BackgroundSetting,
     DailyStats,
@@ -23,16 +24,26 @@ from .security import encrypt_secret
 
 
 def seed_demo(db: Session) -> None:
+    existing_tracker = db.scalar(select(Tracker.id).limit(1))
     if db.scalar(select(Player.id).limit(1)):
-        _ensure_ai_rows(db)
+        tracker = db.query(Tracker).order_by(Tracker.id).first()
+        if tracker:
+            _ensure_ai_rows(db, tracker.id)
         return
 
-    alex = Player(name="Alex", emoji="🧠", accent="accent")
-    sam = Player(name="Sam", emoji="⚡", accent="hot")
+    tracker = db.get(Tracker, existing_tracker) if existing_tracker else None
+    if tracker is None:
+        from ..services.tracker import generate_tracker_code
+        tracker = Tracker(code=generate_tracker_code(db), name="Demo Duo")
+        db.add(tracker)
+        db.flush()
+
+    alex = Player(tracker_id=tracker_id, name="Alex", emoji="🧠", accent="accent")
+    sam = Player(tracker_id=tracker_id, name="Sam", emoji="⚡", accent="hot")
     db.add_all([alex, sam])
     db.flush()
 
-    db.add(BackgroundSetting(id=1, theme="glass", background_type="gradient", background_value="aurora"))
+    db.add(BackgroundSetting(tracker_id=tracker_id, theme="glass", background_type="gradient", background_value="aurora"))
 
     study_samples = [
         (alex, 4, "Economics", "Microeconomics notes", 75),
@@ -69,9 +80,9 @@ def seed_demo(db: Session) -> None:
         stats.workout_minutes += minutes
         add_points(db, player.id, "workout", minutes * WORKOUT_POINTS_PER_MINUTE, minutes)
 
-    p1 = Project(name="Duo Tracker MVP", icon="🖥️", aim="Build a polished two-person self-improvement command center.", owner_id=alex.id)
-    p2 = Project(name="Debate Channel · E20", icon="🎬", aim="Research, storyboard, record, and publish the E20 debate.", owner_id=sam.id)
-    p3 = Project(name="Finance Learning Sprint", icon="📈", aim="Turn the reading backlog into a repeatable weekly learning sprint.", owner_id=alex.id)
+    p1 = Project(tracker_id=tracker_id, name="Duo Tracker MVP", icon="🖥️", aim="Build a polished two-person self-improvement command center.", owner_id=alex.id)
+    p2 = Project(tracker_id=tracker_id, name="Debate Channel · E20", icon="🎬", aim="Research, storyboard, record, and publish the E20 debate.", owner_id=sam.id)
+    p3 = Project(tracker_id=tracker_id, name="Finance Learning Sprint", icon="📈", aim="Turn the reading backlog into a repeatable weekly learning sprint.", owner_id=alex.id)
     db.add_all([p1, p2, p3])
     db.flush()
 
@@ -110,7 +121,7 @@ def seed_demo(db: Session) -> None:
         ProjectNote(project_id=p2.id, player_id=sam.id, note="The strongest debate frame is fuel economics vs emissions trade-offs."),
     ])
 
-    _ensure_ai_rows(db)
+    _ensure_ai_rows(db, tracker.id)
 
 
 def _stats(db: Session, player_id: int, day: date) -> DailyStats:
@@ -122,11 +133,12 @@ def _stats(db: Session, player_id: int, day: date) -> DailyStats:
     return row
 
 
-def _ensure_ai_rows(db: Session) -> None:
+def _ensure_ai_rows(db: Session, tracker_id: int) -> None:
     for slot in range(1, 4):
-        row = db.scalar(select(AIKeySlot).where(AIKeySlot.slot == slot))
+        row = db.scalar(select(AIKeySlot).where(AIKeySlot.tracker_id == tracker_id, AIKeySlot.slot == slot))
         if row is None:
             row = AIKeySlot(
+                tracker_id=tracker_id,
                 slot=slot,
                 provider=settings.AI_DEFAULT_PROVIDER,
                 base_url=settings.AI_DEFAULT_BASE_URL,

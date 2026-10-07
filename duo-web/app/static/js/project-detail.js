@@ -33,7 +33,7 @@ function addTaskModal(){
   root.querySelector('#saveTask').addEventListener('click',async()=>{try{await Duo.api(`/api/projects/${projectId}/tasks`,{method:'POST',body:JSON.stringify({title:root.querySelector('#taskTitle').value,assignee_id:select.value?Number(select.value):null})});root.hidden=true;root.innerHTML='';Duo.toast('Mission added.');await refreshProject();}catch(e){Duo.toast(e.message);}});
 }
 
-async function refreshProject(){ projectData=await Duo.api(`/api/projects/${projectId}`); renderProject(projectData); await Duo.loadState(); renderProject(projectData); }
+async function refreshProject(){ projectData=await Duo.api(`/api/projects/${projectId}`); renderProject(projectData); }
 function confetti(){
   const layer=document.createElement('div');layer.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:99;overflow:hidden;';
   for(let i=0;i<48;i++){const piece=document.createElement('i');piece.textContent='✦';piece.style.cssText=`position:absolute;left:${Math.random()*100}%;top:-10px;font-size:${8+Math.random()*11}px;color:${['#5867ff','#13c8aa','#ed4db6','#dbad34'][i%4]};animation:fall ${1.3+Math.random()*1.5}s ease-out ${Math.random()*.15}s forwards;`;layer.appendChild(piece);}

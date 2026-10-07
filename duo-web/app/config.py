@@ -27,6 +27,9 @@ class Settings:
     AI_DEFAULT_BASE_URL = os.getenv("AI_DEFAULT_BASE_URL", "https://api.openai.com/v1")
     AI_DEFAULT_MODEL = os.getenv("AI_DEFAULT_MODEL", "gpt-5-mini")
     AI_DEFAULT_KEY = os.getenv("AI_DEFAULT_KEY", "")
+    # SQLite database backups are server-wide, so regular tracker members cannot
+    # manage/restore them in a multi-tracker deployment unless an admin explicitly enables it.
+    ALLOW_GLOBAL_BACKUPS = os.getenv("ALLOW_GLOBAL_BACKUPS", "false").lower() in {"1", "true", "yes"}
 
     STATIC_DIR = ROOT_DIR / "app" / "static"
     TEMPLATE_DIR = ROOT_DIR / "app" / "templates"

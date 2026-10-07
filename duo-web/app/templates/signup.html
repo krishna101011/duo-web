@@ -16,21 +16,23 @@
 <div class="auth-wrap">
   <main class="auth-card glass-panel">
     <div class="auth-brand"><span class="brand-logo">D</span><strong>DUO TRACKER</strong></div>
-    <span class="mono-label">{% if first_user %}FIRST PLAYER{% else %}JOIN YOUR PARTNER{% endif %}</span>
-    <h1>Create account</h1>
-    <p class="lead">
-      {% if first_user %}You are the first one here. After you sign up you get a personal tracker code to share with your partner.
-      {% else %}Ask your partner for their 6-character tracker code. You can find it on their Account page.{% endif %}
-    </p>
+    <span class="mono-label">NEW ACCOUNT</span>
+    <h1>Create your Duo</h1>
+    <p class="lead">Make your own private two-player tracker, or join your friend's tracker with their Tracker ID.</p>
     {% if error %}<div class="auth-error" role="alert">{{ error }}</div><br>{% endif %}
+    <div class="signup-mode" role="tablist" aria-label="Tracker choice">
+      <a class="mode-option {% if mode == 'create' %}active{% endif %}" href="/signup?mode=create">🆕 <span><strong>Create new</strong><small>Start a fresh tracker</small></span></a>
+      <a class="mode-option {% if mode == 'join' %}active{% endif %}" href="/signup?mode=join{% if form.code %}&code={{ form.code }}{% endif %}">🔗 <span><strong>Join existing</strong><small>Use your friend's Tracker ID</small></span></a>
+    </div>
     <form class="auth-form" method="post" action="/signup">
+      <input type="hidden" name="mode" value="{{ mode }}">
       <label>Your name<input type="text" name="name" value="{{ form.name or '' }}" maxlength="40" autocomplete="name" required autofocus></label>
       <label>Email<input type="email" name="email" value="{{ form.email or '' }}" autocomplete="email" required></label>
       <label>Password (8+ characters)<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
-      {% if not first_user %}
-      <label>Partner's tracker code<input class="code-input" type="text" name="code" value="{{ form.code or '' }}" maxlength="6" placeholder="••••••" autocomplete="off" required></label>
+      {% if mode == 'join' %}
+      <label>Friend's Tracker ID<input class="code-input" type="text" name="code" value="{{ form.code or '' }}" maxlength="6" minlength="6" placeholder="ABC123" autocomplete="off" required></label>
       {% endif %}
-      <button class="primary-btn" type="submit">{% if first_user %}Create account{% else %}Join tracker{% endif %}</button>
+      <button class="primary-btn" type="submit">{% if mode == 'join' %}Join tracker{% else %}Create my tracker{% endif %}</button>
     </form>
     <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
   </main>

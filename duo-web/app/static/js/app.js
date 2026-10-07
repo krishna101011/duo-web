@@ -1,7 +1,9 @@
 /* Shared client helpers. No build step is required. */
 const Duo = {
   state: null,
+  statePromise: null,
   async api(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
     const config = { ...options, headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(options.headers || {}) } };
     const response = await fetch(url, config);
     let data = {};
@@ -9,6 +11,9 @@ const Duo = {
     if (!response.ok) {
       throw new Error(data.detail || data.message || `Request failed (${response.status})`);
     }
+    // Any successful write invalidates the cached dashboard state. This keeps
+    // refreshes correct while avoiding repeated GET /api/state calls on page load.
+    if (method !== 'GET' && url.startsWith('/api/')) this.state = null;
     return data;
   },
   toast(message) {
@@ -19,11 +24,27 @@ const Duo = {
     clearTimeout(window.__duoToast);
     window.__duoToast = setTimeout(() => node.classList.remove('show'), 1800);
   },
-  async loadState() {
-    this.state = await this.api('/api/state');
-    this.applyAppearance(this.state.background);
-    this.renderTop(this.state.players);
-    return this.state;
+  async loadState(force = false) {
+    // The server now paints the saved background before HTML reaches the browser.
+    // Reuse state during the same page render so sub-pages do not fire duplicate
+    // requests just because their own script also asks for state.
+    if (!force && this.state) return this.state;
+    if (!force && this.statePromise) return this.statePromise;
+
+    this.statePromise = this.api('/api/state').then(state => {
+      this.state = state;
+      const initial = window.DUO_CONFIG?.initialBackground;
+      const sameBackground = initial && state.background &&
+        initial.theme === state.background.theme &&
+        initial.background_type === state.background.background_type &&
+        initial.background_value === state.background.background_value;
+      if (!sameBackground) this.applyAppearance(state.background);
+      this.renderTop(state.players);
+      return state;
+    }).finally(() => {
+      this.statePromise = null;
+    });
+    return this.statePromise;
   },
   applyAppearance(background) {
     if (!background) return;
@@ -66,7 +87,7 @@ const Duo = {
   },
   async loadRivalry() {
     try {
-      const data = await this.api('/api/rivalry');
+      const data = await this.api('/api/rivalry?ai=false');
       const nodes = [document.getElementById('topRivalry'), document.getElementById('homeRivalry')].filter(Boolean);
       nodes.forEach(node => node.textContent = data.message);
       const source = document.getElementById('rivalrySource');

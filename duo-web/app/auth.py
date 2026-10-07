@@ -1,13 +1,11 @@
-"""Login helpers: password hashing, signed session cookies and invite codes.
-
-Uses only the Python standard library, so no new packages are needed.
-"""
+"""Password, signed session cookies, invite/tracker codes, and request context."""
 from __future__ import annotations
 
 import hashlib
 import hmac
 import secrets
 import time
+from contextvars import ContextVar
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,10 +13,30 @@ from sqlalchemy.orm import Session
 from .config import settings
 
 SESSION_COOKIE = "duo_session"
-SESSION_SECONDS = 60 * 60 * 24 * 30  # stay logged in for 30 days
-# No 0/O or 1/I/L so codes are easy to read out loud.
+SESSION_SECONDS = 60 * 60 * 24 * 30
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 6
+
+_current_user_id: ContextVar[int | None] = ContextVar("duo_current_user_id", default=None)
+_current_tracker_id: ContextVar[int | None] = ContextVar("duo_current_tracker_id", default=None)
+
+
+def set_request_context(user_id: int, tracker_id: int):
+    return (_current_user_id.set(user_id), _current_tracker_id.set(tracker_id))
+
+
+def reset_request_context(tokens) -> None:
+    user_token, tracker_token = tokens
+    _current_user_id.reset(user_token)
+    _current_tracker_id.reset(tracker_token)
+
+
+def current_user_id() -> int | None:
+    return _current_user_id.get()
+
+
+def current_tracker_id() -> int | None:
+    return _current_tracker_id.get()
 
 
 def hash_password(password: str) -> str:
@@ -46,7 +64,6 @@ def make_session_token(user_id: int) -> str:
 
 
 def read_session_token(token: str | None) -> int | None:
-    """Return the user id inside a valid, unexpired token, otherwise None."""
     if not token:
         return None
     try:
@@ -60,11 +77,16 @@ def read_session_token(token: str | None) -> int | None:
         return None
 
 
-def generate_invite_code(db: Session) -> str:
-    """Make a random 6-character code that no other user has."""
-    from .models import User
-
+def generate_code(db: Session, model, field_name: str = "code") -> str:
+    """Generate a readable random code unique in the supplied table/field."""
+    field = getattr(model, field_name)
     while True:
         code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
-        if db.scalar(select(User.id).where(User.invite_code == code)) is None:
+        if db.scalar(select(model.id).where(field == code)) is None:
             return code
+
+
+def generate_invite_code(db: Session) -> str:
+    """Backward-compatible personal code generator."""
+    from .models import User
+    return generate_code(db, User, "invite_code")

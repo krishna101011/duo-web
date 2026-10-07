@@ -60,7 +60,7 @@ async function renderStudyChart() {
   studyChart = new Chart(ctx, { type:'line', data:{ labels:data.labels.map(d => d.slice(5)), datasets }, options:{ responsive:true, plugins:{ legend:{ labels:{ color:getComputedStyle(document.body).getPropertyValue('--muted') } } }, scales:{ x:{ ticks:{ color:getComputedStyle(document.body).getPropertyValue('--muted') }, grid:{ color:'rgba(100,110,140,.08)' } }, y:{ beginAtZero:true, ticks:{ color:getComputedStyle(document.body).getPropertyValue('--muted') }, grid:{ color:'rgba(100,110,140,.08)' } } } } });
 }
 
-async function refreshEducation() { await loadEducation(); await renderStudyChart(); await Duo.loadState(); }
+async function refreshEducation() { await loadEducation(); await renderStudyChart(); }
 
 (async function(){ try { await refreshEducation(); } catch(e) { Duo.toast(e.message); } })();
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }

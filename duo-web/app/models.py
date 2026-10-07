@@ -13,16 +13,36 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class Tracker(Base):
+    """A private two-person workspace. Every Duo belongs to exactly one tracker."""
+
+    __tablename__ = "trackers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(12), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default="My Duo Tracker")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    users = relationship("User", back_populates="tracker")
+    players = relationship("Player", back_populates="tracker", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="tracker", cascade="all, delete-orphan")
+    custom_tabs = relationship("CustomTab", back_populates="tracker", cascade="all, delete-orphan")
+    background = relationship("BackgroundSetting", back_populates="tracker", uselist=False, cascade="all, delete-orphan")
+    ai_slots = relationship("AIKeySlot", back_populates="tracker", cascade="all, delete-orphan")
+
+
 class Player(Base):
     __tablename__ = "players"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(80), nullable=False, default="Player")
     avatar_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     emoji: Mapped[str] = mapped_column(String(8), nullable=False, default="🙂")
     accent: Mapped[str] = mapped_column(String(20), nullable=False, default="accent")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
+    tracker = relationship("Tracker", back_populates="players")
     study_entries = relationship("StudyEntry", back_populates="player", cascade="all, delete-orphan")
     activities = relationship("ActivityLog", back_populates="player", cascade="all, delete-orphan")
     project_tasks = relationship("ProjectTask", back_populates="assignee")
@@ -73,12 +93,14 @@ class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     icon: Mapped[str] = mapped_column(String(8), nullable=False, default="🧪")
     aim: Mapped[str] = mapped_column(Text, nullable=False, default="")
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
+    tracker = relationship("Tracker", back_populates="projects")
     tasks = relationship("ProjectTask", back_populates="project", cascade="all, delete-orphan")
     notes = relationship("ProjectNote", back_populates="project", cascade="all, delete-orphan")
 
@@ -116,12 +138,14 @@ class CustomTab(Base):
     __tablename__ = "custom_tabs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     icon: Mapped[str] = mapped_column(String(8), nullable=False, default="✦")
     tracking_type: Mapped[str] = mapped_column(String(30), nullable=False)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
+    tracker = relationship("Tracker", back_populates="custom_tabs")
     entries = relationship("CustomTabEntry", back_populates="tab", cascade="all, delete-orphan")
 
 
@@ -159,17 +183,22 @@ class PointsEvent(Base):
 class BackgroundSetting(Base):
     __tablename__ = "background_settings"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, unique=True)
     theme: Mapped[str] = mapped_column(String(20), nullable=False, default="glass")
     background_type: Mapped[str] = mapped_column(String(20), nullable=False, default="gradient")
     background_value: Mapped[str] = mapped_column(Text, nullable=False, default="aurora")
 
+    tracker = relationship("Tracker", back_populates="background")
+
 
 class AIKeySlot(Base):
     __tablename__ = "ai_key_slots"
+    __table_args__ = (UniqueConstraint("tracker_id", "slot", name="uq_ai_tracker_slot"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    slot: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, index=True)
+    slot: Mapped[int] = mapped_column(Integer, nullable=False)
     provider: Mapped[str] = mapped_column(String(50), nullable=False, default="OpenAI")
     base_url: Mapped[str] = mapped_column(String(255), nullable=False, default="https://api.openai.com/v1")
     model: Mapped[str] = mapped_column(String(120), nullable=False, default="gpt-5-mini")
@@ -179,9 +208,11 @@ class AIKeySlot(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
+    tracker = relationship("Tracker", back_populates="ai_slots")
+
 
 class User(Base):
-    """A login account. Each user owns one of the two player slots."""
+    """A login account. Each user belongs to one tracker and one player slot."""
 
     __tablename__ = "users"
 
@@ -189,6 +220,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Kept for backward compatibility with the old schema. Tracker sharing now uses Tracker.code.
     invite_code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False)
+    tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, index=True)
     player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    tracker = relationship("Tracker", back_populates="users")

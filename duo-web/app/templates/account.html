@@ -11,12 +11,12 @@
 
 <div class="account-grid">
   <section class="account-card glass-panel">
-    <span class="mono-label">YOUR TRACKER CODE</span>
+    <span class="mono-label">YOUR TRACKER ID</span>
     <div class="code-box">
-      <strong id="myCode">{{ me.invite_code }}</strong>
+      <strong id="myCode">{{ tracker.code }}</strong>
       <button class="primary-btn" type="button" id="copyCode">Copy</button>
     </div>
-    <p class="hint">Share this with your partner. They open the sign-up page and type it in to join you. Only share it with people you trust.</p>
+    <p class="hint">Share this Tracker ID with one trusted friend. They choose <strong>Join existing</strong> on sign-up and enter this code.</p>
     <button class="secondary-btn" type="button" id="copyLink">Copy sign-up link</button>
   </section>
 
@@ -24,7 +24,7 @@
     <span class="mono-label">YOUR PARTNER</span>
     {% if partner %}
       <h2>{{ partner.display_name }}</h2>
-      <p>Joined and ready. Their code is <strong style="font-family:'DM Mono',monospace;letter-spacing:.2em">{{ partner.invite_code }}</strong>.</p>
+      <p>Joined and ready. You are sharing this tracker together.</p>
     {% else %}
       <h2>Waiting for your partner</h2>
       <p>No one has joined yet. Send them your code above.</p>

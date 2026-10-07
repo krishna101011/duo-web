@@ -94,9 +94,13 @@
 <section class="settings-section glass-panel">
   <div class="settings-section-head">
     <div><span class="mono-label">BACKUPS</span><h2>Database snapshots</h2></div>
-    <button class="primary-btn" id="createBackupBtn">Create Backup</button>
+    {% if global_backups_enabled %}<button class="primary-btn" id="createBackupBtn">Create Backup</button>{% endif %}
   </div>
-  <div id="backupsList" class="backups-list"></div>
+  {% if global_backups_enabled %}
+    <div id="backupsList" class="backups-list"></div>
+  {% else %}
+    <div class="empty-state">Manual database backup management is disabled for tracker members so one duo cannot restore or delete another duo's data. Use Export JSON/CSV for your own tracker data. Full Reset still creates an automatic server-side safety backup.</div>
+  {% endif %}
 </section>
 
 <!-- ── DANGER ZONE ───────────────────────────────────────────────────────── -->

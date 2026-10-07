@@ -358,8 +358,8 @@ canvas { max-height: 230px; }
   .project-progress { grid-template-columns:1fr; }.project-progress .tiny-note { justify-self:start; }.project-progress strong { font-size:20px; }
   .rank-row { grid-template-columns:28px 1fr 70px 70px; }.rank-row > :nth-child(4), .rank-row > :nth-child(5) { display:none; }
   .podium { grid-template-columns:1fr; }.graph-card { padding:5px; } #networkGraph { min-height:500px; }
-  .mobile-nav { display:grid; grid-template-columns:repeat(5,1fr); position:sticky; bottom:9px; z-index:25; padding:5px; margin-top:13px; }
-  .mobile-nav a { display:grid; place-items:center; gap:1px; padding:7px 4px; border-radius:11px; color:var(--muted); font-size:14px; }.mobile-nav a.active { background:color-mix(in srgb,var(--accent) 10%,transparent); color:var(--text); }.mobile-nav small { font-size:7px; }
+  .mobile-nav { display:grid; grid-template-columns:repeat(6,1fr); position:sticky; bottom:9px; z-index:25; padding:5px; margin-top:13px; }
+  .mobile-nav a, .mobile-logout-form button { display:grid; place-items:center; gap:1px; padding:7px 4px; border-radius:11px; color:var(--muted); font-size:14px; background:transparent; border:0; }.mobile-nav a.active { background:color-mix(in srgb,var(--accent) 10%,transparent); color:var(--text); }.mobile-nav a:hover, .mobile-logout-form button:hover { color:var(--text); background:var(--surface-soft); }.mobile-nav small, .mobile-logout-form small { font-size:7px; }
 }
 
 /* ─── Settings sections (new) ─────────────────────────────────────────────── */
@@ -432,3 +432,6 @@ canvas { max-height: 230px; }
   .player-mgmt-actions { grid-column:1 / -1; }
 }
 
+.logout-nav { margin:0; }
+.logout-btn { width:100%; background:transparent; border:1px solid transparent; text-align:left; }
+.logout-btn:hover { color:var(--danger); background:color-mix(in srgb,var(--danger) 6%,transparent); border-color:color-mix(in srgb,var(--danger) 18%,var(--line)); }

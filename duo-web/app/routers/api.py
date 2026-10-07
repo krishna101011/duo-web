@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Stre
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from ..auth import current_tracker_id, current_user_id
 from ..config import settings
 from ..db import SessionLocal, engine
 from ..models import (
@@ -31,6 +32,7 @@ from ..models import (
     ProjectNote,
     ProjectTask,
     StudyEntry,
+    User,
 )
 from ..schemas import (
     AIKeyUpdate,
@@ -64,6 +66,7 @@ from ..services.data_management import (
 from ..services.rivalry import fallback_rivalry
 from ..services.scoring import TASK_POINTS, get_daily_stats, streak_days, total_points, add_points
 from ..services.security import decrypt_secret, mask_secret
+from ..services.tenant import require_player, require_tracker
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -84,8 +87,15 @@ def get_db() -> Session:
     return SessionLocal()
 
 
+def tracker_id_or_401() -> int:
+    tracker_id = current_tracker_id()
+    if tracker_id is None:
+        raise HTTPException(401, "Please log in first.")
+    return tracker_id
+
+
 def players_payload(db: Session) -> list[dict]:
-    rows = db.scalars(select(Player).order_by(Player.id)).all()
+    rows = db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all()
     return [{"id": p.id, "name": p.name, "emoji": p.emoji, "avatar_path": p.avatar_path, "accent": p.accent} for p in rows]
 
 
@@ -101,7 +111,7 @@ def safe_commit(db: Session) -> None:
 def project_payload(db: Session, project: Project) -> dict:
     tasks = db.scalars(select(ProjectTask).where(ProjectTask.project_id == project.id).order_by(ProjectTask.id)).all()
     notes = db.scalars(select(ProjectNote).where(ProjectNote.project_id == project.id).order_by(ProjectNote.created_at.desc())).all()
-    players = {p.id: p for p in db.scalars(select(Player)).all()}
+    players = {p.id: p for p in db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401())).all()}
     completed = sum(1 for task in tasks if task.completed)
     per_player = {}
     for player_id, player in players.items():
@@ -152,9 +162,10 @@ def favicon():
 @router.get("/state")
 def state():
     with get_db() as db:
+        tracker_id = tracker_id_or_401()
         today = date.today()
         rows = []
-        for player in db.scalars(select(Player).order_by(Player.id)).all():
+        for player in db.scalars(select(Player).where(Player.tracker_id == tracker_id).order_by(Player.id)).all():
             stats = get_daily_stats(db, player.id, today)
             rows.append({
                 "id": player.id,
@@ -168,9 +179,9 @@ def state():
                 "today_points": total_points(db, player.id, today, today),
                 "streak": streak_days(db, player.id),
             })
-        background = db.get(BackgroundSetting, 1)
-        projects = db.scalars(select(Project).order_by(Project.id.desc())).all()
-        custom_tabs = db.scalars(select(CustomTab).order_by(CustomTab.id)).all()
+        background = db.scalar(select(BackgroundSetting).where(BackgroundSetting.tracker_id == tracker_id))
+        projects = db.scalars(select(Project).where(Project.tracker_id == tracker_id).order_by(Project.id.desc())).all()
+        custom_tabs = db.scalars(select(CustomTab).where(CustomTab.tracker_id == tracker_id).order_by(CustomTab.id)).all()
         return {
             "players": rows,
             "background": {
@@ -190,7 +201,7 @@ def state():
 @router.patch("/players/{player_id}")
 def update_player(player_id: int, payload: PlayerUpdate):
     with get_db() as db:
-        player = db.get(Player, player_id)
+        player = require_player(db, player_id)
         if not player:
             raise HTTPException(404, "Player not found.")
         player.name = payload.name.strip()
@@ -205,7 +216,7 @@ def upload_avatar(player_id: int, file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(400, "Please upload a PNG, JPEG, WEBP, or GIF image.")
     with get_db() as db:
-        player = db.get(Player, player_id)
+        player = require_player(db, player_id)
         if not player:
             raise HTTPException(404, "Player not found.")
         data = file.file.read(MAX_UPLOAD_BYTES + 1)
@@ -224,7 +235,7 @@ def upload_avatar(player_id: int, file: UploadFile = File(...)):
 def player_stats(player_id: int):
     """Detailed statistics for a single player."""
     with get_db() as db:
-        player = db.get(Player, player_id)
+        player = require_player(db, player_id)
         if not player:
             raise HTTPException(404, "Player not found.")
         today = date.today()
@@ -252,9 +263,10 @@ def player_stats(player_id: int):
 @router.post("/background")
 def update_background(payload: BackgroundUpdate):
     with get_db() as db:
-        bg = db.get(BackgroundSetting, 1)
+        tracker_id = tracker_id_or_401()
+        bg = db.scalar(select(BackgroundSetting).where(BackgroundSetting.tracker_id == tracker_id))
         if bg is None:
-            bg = BackgroundSetting(id=1)
+            bg = BackgroundSetting(tracker_id=tracker_id)
             db.add(bg)
         bg.theme = payload.theme
         bg.background_type = payload.background_type
@@ -275,7 +287,10 @@ def upload_background(file: UploadFile = File(...)):
     destination = settings.UPLOAD_DIR / filename
     destination.write_bytes(data)
     with get_db() as db:
-        bg = db.get(BackgroundSetting, 1) or BackgroundSetting(id=1)
+        tracker_id = tracker_id_or_401()
+        bg = db.scalar(select(BackgroundSetting).where(BackgroundSetting.tracker_id == tracker_id))
+        if bg is None:
+            bg = BackgroundSetting(tracker_id=tracker_id)
         db.add(bg)
         bg.background_type = "image"
         bg.background_value = f"/uploads/{filename}"
@@ -290,7 +305,7 @@ def upload_background(file: UploadFile = File(...)):
 @router.get("/education")
 def education_data():
     with get_db() as db:
-        players = db.scalars(select(Player).order_by(Player.id)).all()
+        players = db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all()
         result = []
         for p in players:
             entries = db.scalars(select(StudyEntry).where(StudyEntry.player_id == p.id).order_by(StudyEntry.created_at.desc()).limit(15)).all()
@@ -306,8 +321,7 @@ def education_data():
 @router.post("/education/entries")
 def add_study(payload: StudyCreate):
     with get_db() as db:
-        if not db.get(Player, payload.player_id):
-            raise HTTPException(404, "Player not found.")
+        require_player(db, payload.player_id)
         entry = StudyEntry(player_id=payload.player_id, subject=payload.subject.strip(), notes=payload.notes.strip(), minutes=0)
         db.add(entry)
         safe_commit(db)
@@ -318,7 +332,7 @@ def add_study(payload: StudyCreate):
 def delete_study_entry_route(entry_id: int):
     with get_db() as db:
         try:
-            delete_study_entry(db, entry_id)
+            delete_study_entry(db, entry_id, tracker_id_or_401())
             safe_commit(db)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -332,8 +346,7 @@ def delete_study_entry_route(entry_id: int):
 @router.put("/education/today")
 def update_study_minutes(payload: StudyMinutesUpdate):
     with get_db() as db:
-        if not db.get(Player, payload.player_id):
-            raise HTTPException(404, "Player not found.")
+        require_player(db, payload.player_id)
         stats = get_daily_stats(db, payload.player_id)
         delta = payload.minutes - stats.study_minutes
         stats.study_minutes = payload.minutes
@@ -351,7 +364,7 @@ def update_study_minutes(payload: StudyMinutesUpdate):
 def fitness_data():
     with get_db() as db:
         result = []
-        for p in db.scalars(select(Player).order_by(Player.id)).all():
+        for p in db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all():
             logs = db.scalars(select(ActivityLog).where(ActivityLog.player_id == p.id).order_by(ActivityLog.created_at.desc()).limit(15)).all()
             result.append({
                 "player_id": p.id,
@@ -365,8 +378,7 @@ def fitness_data():
 @router.post("/fitness")
 def add_activity(payload: ActivityCreate):
     with get_db() as db:
-        if not db.get(Player, payload.player_id):
-            raise HTTPException(404, "Player not found.")
+        require_player(db, payload.player_id)
         log = ActivityLog(player_id=payload.player_id, activity=payload.activity.strip(), duration_minutes=payload.duration_minutes)
         db.add(log)
         stats = get_daily_stats(db, payload.player_id)
@@ -380,7 +392,7 @@ def add_activity(payload: ActivityCreate):
 def delete_activity_entry_route(entry_id: int):
     with get_db() as db:
         try:
-            delete_activity_entry(db, entry_id)
+            delete_activity_entry(db, entry_id, tracker_id_or_401())
             safe_commit(db)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -398,15 +410,30 @@ def delete_activity_entry_route(entry_id: int):
 @router.get("/projects")
 def project_list():
     with get_db() as db:
-        return {"projects": [project_payload(db, p) for p in db.scalars(select(Project).order_by(Project.id.desc()).all())]}
+        projects = db.scalars(
+            select(Project).where(Project.tracker_id == tracker_id_or_401()).order_by(Project.id.desc())
+        ).all()
+        return {"projects": [project_payload(db, p) for p in projects]}
 
 
 @router.post("/projects")
 def create_project(payload: ProjectCreate):
     with get_db() as db:
-        if payload.owner_id is not None and not db.get(Player, payload.owner_id):
-            raise HTTPException(400, "Project owner does not exist.")
-        project = Project(name=payload.name.strip(), icon=payload.icon.strip(), aim=payload.aim.strip(), owner_id=payload.owner_id)
+        tracker_id = tracker_id_or_401()
+        owner_id = payload.owner_id
+        if owner_id is not None:
+            require_player(db, owner_id)
+        else:
+            owner_id = db.scalar(select(User.player_id).where(User.id == current_user_id()))
+            if owner_id is not None:
+                require_player(db, owner_id)
+        project = Project(
+            tracker_id=tracker_id,
+            name=payload.name.strip(),
+            icon=payload.icon.strip(),
+            aim=payload.aim.strip(),
+            owner_id=owner_id,
+        )
         db.add(project)
         safe_commit(db)
         return {"ok": True, "project": project_payload(db, project)}
@@ -415,20 +442,20 @@ def create_project(payload: ProjectCreate):
 @router.get("/projects/{project_id}")
 def get_project(project_id: int):
     with get_db() as db:
-        project = db.get(Project, project_id)
+        project = db.scalar(select(Project).where(Project.id == project_id, Project.tracker_id == tracker_id_or_401()))
         if not project:
-            raise HTTPException(404, "Project not found.")
+            raise HTTPException(404, "Project not found in this tracker.")
         return project_payload(db, project)
 
 
 @router.post("/projects/{project_id}/tasks")
 def create_task(project_id: int, payload: TaskCreate):
     with get_db() as db:
-        project = db.get(Project, project_id)
+        project = db.scalar(select(Project).where(Project.id == project_id, Project.tracker_id == tracker_id_or_401()))
         if not project:
-            raise HTTPException(404, "Project not found.")
-        if payload.assignee_id is not None and not db.get(Player, payload.assignee_id):
-            raise HTTPException(400, "Assignee does not exist.")
+            raise HTTPException(404, "Project not found in this tracker.")
+        if payload.assignee_id is not None:
+            require_player(db, payload.assignee_id)
         task = ProjectTask(project_id=project_id, title=payload.title.strip(), assignee_id=payload.assignee_id)
         db.add(task)
         safe_commit(db)
@@ -438,9 +465,9 @@ def create_task(project_id: int, payload: TaskCreate):
 @router.patch("/projects/tasks/{task_id}")
 def toggle_task(task_id: int, payload: TaskToggle):
     with get_db() as db:
-        task = db.get(ProjectTask, task_id)
+        task = db.scalar(select(ProjectTask).join(Project, ProjectTask.project_id == Project.id).where(ProjectTask.id == task_id, Project.tracker_id == tracker_id_or_401()))
         if not task:
-            raise HTTPException(404, "Task not found.")
+            raise HTTPException(404, "Task not found in this tracker.")
         was_completed = task.completed
         task.completed = payload.completed
         if payload.completed and not was_completed:
@@ -456,8 +483,9 @@ def toggle_task(task_id: int, payload: TaskToggle):
 @router.post("/projects/{project_id}/notes")
 def add_project_note(project_id: int, payload: ProjectNoteCreate):
     with get_db() as db:
-        if not db.get(Project, project_id) or not db.get(Player, payload.player_id):
-            raise HTTPException(404, "Project or player not found.")
+        if not db.scalar(select(Project.id).where(Project.id == project_id, Project.tracker_id == tracker_id_or_401())):
+            raise HTTPException(404, "Project not found in this tracker.")
+        require_player(db, payload.player_id)
         note = ProjectNote(project_id=project_id, player_id=payload.player_id, note=payload.note.strip())
         db.add(note)
         safe_commit(db)
@@ -471,9 +499,15 @@ def add_project_note(project_id: int, payload: ProjectNoteCreate):
 @router.post("/custom-tabs")
 def create_custom_tab(payload: CustomTabCreate):
     with get_db() as db:
-        if payload.created_by is not None and not db.get(Player, payload.created_by):
-            raise HTTPException(400, "Creator does not exist.")
-        tab = CustomTab(name=payload.name.strip(), icon=payload.icon.strip(), tracking_type=payload.tracking_type, created_by=payload.created_by)
+        tracker_id = tracker_id_or_401()
+        creator_id = payload.created_by
+        if creator_id is not None:
+            require_player(db, creator_id)
+        if creator_id is None:
+            from ..auth import current_user_id
+            from ..models import User
+            creator_id = db.scalar(select(User.player_id).where(User.id == current_user_id())) if current_user_id() else None
+        tab = CustomTab(tracker_id=tracker_id, name=payload.name.strip(), icon=payload.icon.strip(), tracking_type=payload.tracking_type, created_by=creator_id)
         db.add(tab)
         safe_commit(db)
         return {"ok": True, "tab": {"id": tab.id, "name": tab.name, "icon": tab.icon, "tracking_type": tab.tracking_type}}
@@ -483,11 +517,13 @@ def create_custom_tab(payload: CustomTabCreate):
 def update_custom_tab(tab_id: int, payload: CustomTabUpdate):
     with get_db() as db:
         try:
-            rename_tab(db, tab_id, payload.name, payload.icon)
+            rename_tab(db, tab_id, payload.name, payload.icon, tracker_id_or_401())
             safe_commit(db)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
-        tab = db.get(CustomTab, tab_id)
+        tab = db.scalar(select(CustomTab).where(CustomTab.id == tab_id, CustomTab.tracker_id == tracker_id_or_401()))
+        if tab is None:
+            raise HTTPException(404, "Custom tab not found in this tracker.")
         return {"ok": True, "tab": {"id": tab.id, "name": tab.name, "icon": tab.icon}}
 
 
@@ -495,7 +531,7 @@ def update_custom_tab(tab_id: int, payload: CustomTabUpdate):
 def delete_custom_tab(tab_id: int):
     with get_db() as db:
         try:
-            name = delete_tab(db, tab_id)
+            name = delete_tab(db, tab_id, tracker_id_or_401())
             safe_commit(db)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -509,11 +545,11 @@ def delete_custom_tab(tab_id: int):
 @router.get("/custom-tabs/{tab_id}")
 def custom_tab_data(tab_id: int):
     with get_db() as db:
-        tab = db.get(CustomTab, tab_id)
+        tab = db.scalar(select(CustomTab).where(CustomTab.id == tab_id, CustomTab.tracker_id == tracker_id_or_401()))
         if not tab:
-            raise HTTPException(404, "Custom tab not found.")
+            raise HTTPException(404, "Custom tab not found in this tracker.")
         result = []
-        for p in db.scalars(select(Player).order_by(Player.id)).all():
+        for p in db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all():
             entries = db.scalars(select(CustomTabEntry).where(CustomTabEntry.tab_id == tab_id, CustomTabEntry.player_id == p.id).order_by(CustomTabEntry.created_at.desc()).limit(30)).all()
             result.append({"player_id": p.id, "name": p.name, "entries": [{"id": e.id, "day": e.day.isoformat(), "label": e.label, "value": e.value, "note": e.note} for e in entries]})
         return {"tab": {"id": tab.id, "name": tab.name, "icon": tab.icon, "tracking_type": tab.tracking_type}, "players": result}
@@ -522,8 +558,9 @@ def custom_tab_data(tab_id: int):
 @router.post("/custom-tabs/{tab_id}/entries")
 def add_custom_entry(tab_id: int, payload: CustomEntryCreate):
     with get_db() as db:
-        if not db.get(CustomTab, tab_id) or not db.get(Player, payload.player_id):
-            raise HTTPException(404, "Custom tab or player not found.")
+        if not db.scalar(select(CustomTab.id).where(CustomTab.id == tab_id, CustomTab.tracker_id == tracker_id_or_401())):
+            raise HTTPException(404, "Custom tab not found in this tracker.")
+        require_player(db, payload.player_id)
         entry = CustomTabEntry(tab_id=tab_id, player_id=payload.player_id, label=payload.label.strip(), value=payload.value, note=payload.note.strip())
         db.add(entry)
         safe_commit(db)
@@ -540,7 +577,7 @@ def leaderboard_data():
     week_start = today - timedelta(days=today.weekday())
     with get_db() as db:
         result = []
-        for p in db.scalars(select(Player).order_by(Player.id)).all():
+        for p in db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all():
             study_count = db.scalar(select(func.count(StudyEntry.id)).where(StudyEntry.player_id == p.id)) or 0
             activity_count = db.scalar(select(func.count(ActivityLog.id)).where(ActivityLog.player_id == p.id)) or 0
             result.append({
@@ -565,7 +602,7 @@ def chart_data(days: int = 14):
     start = date.today() - timedelta(days=days - 1)
     labels = [(start + timedelta(days=i)).isoformat() for i in range(days)]
     with get_db() as db:
-        player_rows = db.scalars(select(Player).order_by(Player.id)).all()
+        player_rows = db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all()
         result = {"labels": labels, "players": []}
         for p in player_rows:
             stats = db.scalars(select(DailyStats).where(DailyStats.player_id == p.id, DailyStats.day >= start).order_by(DailyStats.day)).all()
@@ -589,36 +626,57 @@ def chart_data(days: int = 14):
 @router.get("/graph")
 def graph_data():
     with get_db() as db:
-        players = db.scalars(select(Player)).all()
+        tracker_id = tracker_id_or_401()
+        players = db.scalars(select(Player).where(Player.tracker_id == tracker_id).order_by(Player.id)).all()
+        player_ids = [p.id for p in players]
         nodes: list[dict] = []
         edges: list[dict] = []
-        for p in players:
-            user_color = "#5867ff" if p.id == players[0].id else "#ed4db6"
+
+        for index, p in enumerate(players):
+            user_color = "#5867ff" if index == 0 else "#ed4db6"
             nodes.append({"id": f"p{p.id}", "label": p.name, "group": "player", "title": "Player", "user_color": user_color})
-        for project in db.scalars(select(Project)).all():
+
+        projects = db.scalars(select(Project).where(Project.tracker_id == tracker_id)).all()
+        project_ids = [project.id for project in projects]
+        for project in projects:
             pid = f"project-{project.id}"
             nodes.append({"id": pid, "label": project.name, "group": "project", "title": project.aim})
-            if project.owner_id:
+            if project.owner_id in player_ids:
                 edges.append({"from": f"p{project.owner_id}", "to": pid, "label": "owns"})
             for task in project.tasks:
                 tid = f"task-{task.id}"
-                task_color = next(("#5867ff" if p.id == task.assignee_id else "#ed4db6" for p in players if p.id == task.assignee_id), "#13c8aa")
+                if task.assignee_id in player_ids:
+                    task_color = "#5867ff" if players and task.assignee_id == players[0].id else "#ed4db6"
+                else:
+                    task_color = "#13c8aa"
                 nodes.append({"id": tid, "label": task.title, "group": "task", "title": "Task", "user_color": task_color})
                 edges.append({"from": pid, "to": tid, "label": "mission"})
-                if task.assignee_id:
+                if task.assignee_id in player_ids:
                     edges.append({"from": f"p{task.assignee_id}", "to": tid, "label": "assigned"})
-        subjects = db.scalars(select(StudyEntry.subject).distinct()).all()
-        for index, subject in enumerate(subjects, 1):
-            sid = f"subject-{index}"
-            nodes.append({"id": sid, "label": str(subject), "group": "subject", "title": "Study subject"})
-            for entry in db.scalars(select(StudyEntry).where(StudyEntry.subject == subject).limit(3)).all():
-                edges.append({"from": f"p{entry.player_id}", "to": sid, "label": "studies"})
-        activities = db.scalars(select(ActivityLog.activity).distinct()).all()
-        for index, activity in enumerate(activities, 1):
-            aid = f"activity-{index}"
-            nodes.append({"id": aid, "label": str(activity), "group": "activity", "title": "Physical activity"})
-            for entry in db.scalars(select(ActivityLog).where(ActivityLog.activity == activity).limit(3)).all():
-                edges.append({"from": f"p{entry.player_id}", "to": aid, "label": "does"})
+
+        if player_ids:
+            subjects = db.scalars(
+                select(StudyEntry.subject).where(StudyEntry.player_id.in_(player_ids)).distinct()
+            ).all()
+            for index, subject in enumerate(subjects, 1):
+                sid = f"subject-{index}"
+                nodes.append({"id": sid, "label": str(subject), "group": "subject", "title": "Study subject"})
+                for entry in db.scalars(
+                    select(StudyEntry).where(StudyEntry.player_id.in_(player_ids), StudyEntry.subject == subject).limit(3)
+                ).all():
+                    edges.append({"from": f"p{entry.player_id}", "to": sid, "label": "studies"})
+
+            activities = db.scalars(
+                select(ActivityLog.activity).where(ActivityLog.player_id.in_(player_ids)).distinct()
+            ).all()
+            for index, activity in enumerate(activities, 1):
+                aid = f"activity-{index}"
+                nodes.append({"id": aid, "label": str(activity), "group": "activity", "title": "Physical activity"})
+                for entry in db.scalars(
+                    select(ActivityLog).where(ActivityLog.player_id.in_(player_ids), ActivityLog.activity == activity).limit(3)
+                ).all():
+                    edges.append({"from": f"p{entry.player_id}", "to": aid, "label": "does"})
+
         return {"nodes": nodes, "edges": edges}
 
 
@@ -629,7 +687,7 @@ def graph_data():
 @router.get("/rivalry")
 def rivalry_data(ai: bool = True):
     with get_db() as db:
-        players = db.scalars(select(Player).order_by(Player.id)).all()
+        players = db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all()
         if len(players) < 2:
             return {"message": "Add two players to unlock rivalry mode.", "source": "template"}
         p1, p2 = players[:2]
@@ -653,7 +711,7 @@ def rivalry_data(ai: bool = True):
 @router.get("/ai/summary")
 def ai_summary(kind: str = "summary"):
     with get_db() as db:
-        players = db.scalars(select(Player).order_by(Player.id)).all()
+        players = db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401()).order_by(Player.id)).all()
         prompt = ""
         if kind == "suggestions":
             prompt = "Give three practical study suggestions for two friends tracking education, projects, and fitness. Make them concise."
@@ -677,7 +735,7 @@ def ai_summary(kind: str = "summary"):
 @router.get("/settings/ai")
 def ai_settings():
     with get_db() as db:
-        rows = db.scalars(select(AIKeySlot).order_by(AIKeySlot.slot)).all()
+        rows = db.scalars(select(AIKeySlot).where(AIKeySlot.tracker_id == tracker_id_or_401()).order_by(AIKeySlot.slot)).all()
         return {
             "slots": [
                 {
@@ -733,7 +791,7 @@ def test_ai_failover():
 def reset_player_score_route(player_id: int):
     with get_db() as db:
         try:
-            reset_player_score(db, player_id)
+            reset_player_score(db, player_id, tracker_id_or_401())
             safe_commit(db)
         except ValueError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -748,7 +806,7 @@ def reset_player_score_route(player_id: int):
 def clear_history_route():
     with get_db() as db:
         try:
-            clear_history(db)
+            clear_history(db, tracker_id_or_401())
             safe_commit(db)
         except Exception as exc:
             db.rollback()
@@ -761,7 +819,7 @@ def clear_history_route():
 def reset_scores_route():
     with get_db() as db:
         try:
-            reset_scores(db)
+            reset_scores(db, tracker_id_or_401())
             safe_commit(db)
         except Exception as exc:
             db.rollback()
@@ -785,7 +843,7 @@ def reset_all_route(payload: ConfirmReset):
 
     with get_db() as db:
         try:
-            reset_all_data(db)
+            reset_all_data(db, tracker_id_or_401())
             safe_commit(db)
         except Exception as exc:
             db.rollback()
@@ -798,8 +856,14 @@ def reset_all_route(payload: ConfirmReset):
 # Backups
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _require_global_backup_access() -> None:
+    if not settings.ALLOW_GLOBAL_BACKUPS:
+        raise HTTPException(403, "Manual database backups are disabled in multi-tracker mode. Tracker data can be exported from Data Management.")
+
+
 @router.get("/data/backups")
 def list_backups_route():
+    _require_global_backup_access()
     try:
         backups = list_backups(settings.BACKUP_DIR)
     except Exception as exc:
@@ -810,6 +874,7 @@ def list_backups_route():
 
 @router.post("/data/backup")
 def create_backup_route():
+    _require_global_backup_access()
     db_path = _db_file_path()
     try:
         filename = create_backup(db_path, settings.BACKUP_DIR)
@@ -823,6 +888,7 @@ def create_backup_route():
 
 @router.post("/data/restore/{filename}")
 def restore_backup_route(filename: str):
+    _require_global_backup_access()
     # Prevent directory traversal
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(400, "Invalid backup filename.")
@@ -843,6 +909,7 @@ def restore_backup_route(filename: str):
 
 @router.delete("/data/backups/{filename}")
 def delete_backup_route(filename: str):
+    _require_global_backup_access()
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(400, "Invalid backup filename.")
     try:
@@ -865,12 +932,15 @@ def export_csv():
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["type", "player", "date", "label", "value", "notes"])
-        players = {p.id: p.name for p in db.scalars(select(Player)).all()}
-        for row in db.scalars(select(StudyEntry).order_by(StudyEntry.day)).all():
+        players = {p.id: p.name for p in db.scalars(select(Player).where(Player.tracker_id == tracker_id_or_401())).all()}
+        player_ids = list(players.keys())
+        study_query = select(StudyEntry).where(StudyEntry.player_id.in_(player_ids)) if player_ids else select(StudyEntry).where(StudyEntry.id == -1)
+        activity_query = select(ActivityLog).where(ActivityLog.player_id.in_(player_ids)) if player_ids else select(ActivityLog).where(ActivityLog.id == -1)
+        for row in db.scalars(study_query.order_by(StudyEntry.day)).all():
             writer.writerow(["study", players.get(row.player_id, ""), row.day, row.subject, row.minutes, row.notes])
-        for row in db.scalars(select(ActivityLog).order_by(ActivityLog.day)).all():
+        for row in db.scalars(activity_query.order_by(ActivityLog.day)).all():
             writer.writerow(["activity", players.get(row.player_id, ""), row.day, row.activity, row.duration_minutes, ""])
-        for row in db.scalars(select(ProjectTask).order_by(ProjectTask.id)).all():
+        for row in db.scalars(select(ProjectTask).join(Project, ProjectTask.project_id == Project.id).where(Project.tracker_id == tracker_id_or_401()).order_by(ProjectTask.id)).all():
             writer.writerow(["project_task", players.get(row.assignee_id, ""), row.completed_at.date() if row.completed_at else "", row.title, int(row.completed), ""])
         output.seek(0)
         headers = {"Content-Disposition": 'attachment; filename="duo_tracker_export.csv"'}
@@ -880,7 +950,7 @@ def export_csv():
 @router.get("/export.json")
 def export_json_route():
     with get_db() as db:
-        data = export_json(db)
+        data = export_json(db, tracker_id_or_401())
     json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     headers = {"Content-Disposition": 'attachment; filename="duo_tracker_export.json"'}
     return StreamingResponse(iter([json_bytes]), media_type="application/json", headers=headers)

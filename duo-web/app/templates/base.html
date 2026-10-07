@@ -12,13 +12,13 @@
   <link rel="stylesheet" href="/static/css/app.css">
   {% block head %}{% endblock %}
 </head>
-<body data-theme="glass">
+<body data-theme="{{ background.theme if background else 'glass' }}" style="{{ background_css|default('background: #eef3f8;') }}">
 <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 <div class="app-shell">
   <aside class="sidebar glass-panel">
     <a class="brand" href="/">
       <span class="brand-logo">D</span>
-      <span><strong>DUO TRACKER</strong><small>two players · one scoreboard</small></span>
+      <span><strong>DUO TRACKER</strong><small>two players · one tracker</small></span>
     </a>
     <nav class="side-nav" aria-label="Primary navigation">
       <a class="nav-item {% if page == 'home' %}active{% endif %}" href="/"><span>⌂</span> Home</a>
@@ -38,6 +38,7 @@
       <a class="nav-item {% if page == 'account' %}active{% endif %}" href="/account"><span>👤</span> Account &amp; code</a>
       <a class="nav-item {% if page == 'settings' %}active{% endif %}" href="/settings"><span>⚙</span> Settings</a>
       <a class="export-link" href="/api/export.csv">Export CSV ↓</a>
+      <form class="logout-nav" method="post" action="/logout"><button class="nav-item logout-btn" type="submit"><span>🚪</span> Log out</button></form>
     </div>
   </aside>
 
@@ -82,13 +83,14 @@
       <a href="/projects" class="{% if page == 'projects' %}active{% endif %}">🧪<small>Build</small></a>
       <a href="/leaderboard" class="{% if page == 'leaderboard' %}active{% endif %}">🏆<small>Rank</small></a>
       <a href="/settings" class="{% if page == 'settings' %}active{% endif %}">⚙<small>Settings</small></a>
+      <form class="mobile-logout-form" method="post" action="/logout"><button type="submit" aria-label="Log out">🚪<small>Logout</small></button></form>
     </nav>
   </main>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="modalRoot"></div>
-<script>window.DUO_CONFIG = {page: {{ page|tojson }}, customTabId: {{ (tab.id if tab is defined else none)|tojson }}, projectId: {{ (project.id if project is defined else none)|tojson }}};</script>
+<script>window.DUO_CONFIG = {initialBackground: {{ {"theme": (background.theme if background else "glass"), "background_type": (background.background_type if background else "gradient"), "background_value": (background.background_value if background else "aurora")}|tojson }}, page: {{ page|tojson }}, customTabId: {{ (tab.id if tab is defined else none)|tojson }}, projectId: {{ (project.id if project is defined else none)|tojson }}};</script>
 <script src="/static/js/app.js"></script>
 {% block scripts %}{% endblock %}
 </body>

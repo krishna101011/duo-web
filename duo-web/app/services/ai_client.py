@@ -22,6 +22,7 @@ except ImportError:  # The core tracker can still boot without AI installed.
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import current_tracker_id
 from ..models import AIKeySlot
 from .security import decrypt_secret, encrypt_secret, mask_secret
 
@@ -41,11 +42,14 @@ class ProviderSlot:
 class AIClientManager:
     """Loads provider slots from SQLite and tries them in priority order."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, tracker_id: int | None = None):
         self.db = db
+        self.tracker_id = tracker_id if tracker_id is not None else current_tracker_id()
+        if self.tracker_id is None:
+            raise RuntimeError("No active tracker is available for AI settings.")
 
     def slots(self) -> list[ProviderSlot]:
-        rows = self.db.scalars(select(AIKeySlot).order_by(AIKeySlot.slot)).all()
+        rows = self.db.scalars(select(AIKeySlot).where(AIKeySlot.tracker_id == self.tracker_id).order_by(AIKeySlot.slot)).all()
         result: list[ProviderSlot] = []
         for row in rows:
             key = decrypt_secret(row.encrypted_key)
@@ -62,9 +66,9 @@ class AIClientManager:
         key: str | None,
         enabled: bool,
     ) -> AIKeySlot:
-        row = self.db.scalar(select(AIKeySlot).where(AIKeySlot.slot == slot_number))
+        row = self.db.scalar(select(AIKeySlot).where(AIKeySlot.tracker_id == self.tracker_id, AIKeySlot.slot == slot_number))
         if row is None:
-            row = AIKeySlot(slot=slot_number)
+            row = AIKeySlot(tracker_id=self.tracker_id, slot=slot_number)
             self.db.add(row)
         row.provider = provider
         row.base_url = base_url
@@ -131,7 +135,7 @@ class AIClientManager:
         raise RuntimeError(f"All configured AI providers failed. Last error: {last_error}")
 
     def test_slot(self, slot_number: int) -> tuple[bool, str]:
-        row = self.db.scalar(select(AIKeySlot).where(AIKeySlot.slot == slot_number))
+        row = self.db.scalar(select(AIKeySlot).where(AIKeySlot.tracker_id == self.tracker_id, AIKeySlot.slot == slot_number))
         if row is None:
             return False, "Slot not configured."
         key = decrypt_secret(row.encrypted_key)
@@ -158,7 +162,7 @@ class AIClientManager:
             return False, str(exc), None
 
     def _mark(self, slot_number: int, status: str, error: str | None) -> None:
-        row = self.db.scalar(select(AIKeySlot).where(AIKeySlot.slot == slot_number))
+        row = self.db.scalar(select(AIKeySlot).where(AIKeySlot.tracker_id == self.tracker_id, AIKeySlot.slot == slot_number))
         if row:
             row.last_status = status
             row.last_error = error
