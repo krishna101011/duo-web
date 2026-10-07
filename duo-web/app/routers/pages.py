@@ -17,7 +17,46 @@ from ..models import BackgroundSetting, CustomTab, Player, Project
 from ..services.tenant import require_tracker
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(settings.TEMPLATE_DIR))
+
+
+class SafeJinja2Templates(Jinja2Templates):
+    """Render templates directly to HTMLResponse.
+
+    Starlette 1.7.0's internal _TemplateResponse calls .get() on the
+    request object stored in the context while handling the response. That
+    is incompatible with the Request object that FastAPI/Jinja expects in
+    the context. Rendering to a normal HTMLResponse avoids that framework
+    regression while preserving Jinja url_for() support.
+    """
+
+    def TemplateResponse(
+        self,
+        request,
+        name,
+        context=None,
+        status_code=200,
+        headers=None,
+        media_type=None,
+        background=None,
+    ):
+        render_context = dict(context or {})
+        render_context.setdefault("request", request)
+        template = self.get_template(name)
+        response = HTMLResponse(
+            template.render(render_context),
+            status_code=status_code,
+            headers=headers,
+            media_type=media_type,
+            background=background,
+        )
+        # Keep the attributes that Starlette's TemplateResponse exposes, so
+        # existing tests/debugging tools can still inspect the rendered template.
+        response.template = template
+        response.context = render_context
+        return response
+
+
+templates = SafeJinja2Templates(directory=str(settings.TEMPLATE_DIR))
 
 _GRADIENTS = {
     "glass:aurora": "linear-gradient(125deg,#eef3f8 0%,#dfe7ff 48%,#d8f2ed 100%)",
