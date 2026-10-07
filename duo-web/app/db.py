@@ -14,9 +14,24 @@ class Base(DeclarativeBase):
     pass
 
 
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, future=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+def _clean_database_url(url: str) -> str:
+    """Make a copy-pasted Postgres address (e.g. from Neon) work as-is."""
+    url = url.strip().strip("'\"")
+    if url.startswith("psql "):
+        url = url[5:].strip().strip("'\"")
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            url = "postgresql+psycopg2://" + url[len(prefix):]
+    return url.replace("&channel_binding=require", "").replace("?channel_binding=require&", "?")
+
+
+DATABASE_URL = _clean_database_url(settings.DATABASE_URL)
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith(
+    "sqlite") else {}
+engine = create_engine(
+    DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, future=True)
+SessionLocal = sessionmaker(
+    bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
 def init_db() -> None:
