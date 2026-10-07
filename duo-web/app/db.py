@@ -100,6 +100,61 @@ def _rebuild_sqlite_ai_table(connection) -> None:
     connection.execute(text("PRAGMA foreign_keys=ON"))
 
 
+def _ensure_postgres_background_id_default(connection) -> None:
+    """Repair legacy PostgreSQL background_settings.id columns with no generator.
+
+    Older production databases can have an INTEGER primary-key column without
+    a sequence/identity default. SQLAlchemy then sends NULL for id on INSERT,
+    which PostgreSQL rejects even though the model marks it as a primary key.
+    This migration creates a dedicated sequence, starts it above the current
+    maximum id, and attaches it as the column default without changing data.
+    """
+    if connection.dialect.name != "postgresql":
+        return
+
+    row = connection.execute(
+        text("""
+            SELECT column_default, is_identity
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'background_settings'
+              AND column_name = 'id'
+        """)
+    ).mappings().first()
+    if not row:
+        return
+
+    # Fresh PostgreSQL tables normally use SERIAL/IDENTITY. Only repair the
+    # legacy case where there is genuinely no generator.
+    if row["column_default"] or row["is_identity"] == "YES":
+        return
+
+    sequence_name = "background_settings_id_seq"
+    connection.execute(text(f'CREATE SEQUENCE IF NOT EXISTS "{sequence_name}"'))
+
+    max_id = int(
+        connection.execute(text(
+            'SELECT COALESCE(MAX(id), 0) FROM "background_settings"'
+        )).scalar()
+        or 0
+    )
+    # false means nextval() returns exactly this value.
+    next_id = max_id + 1
+    connection.execute(
+        text(f"SELECT setval('{sequence_name}'::regclass, :next_id, false)"),
+        {"next_id": next_id},
+    )
+    connection.execute(
+        text(f'ALTER SEQUENCE "{sequence_name}" OWNED BY "background_settings"."id"')
+    )
+    connection.execute(
+        text(
+            f"ALTER TABLE \"background_settings\" "
+            f"ALTER COLUMN \"id\" SET DEFAULT nextval('\"{sequence_name}\"'::regclass)"
+        )
+    )
+
+
 def _postgres_ai_constraints(connection) -> None:
     """Drop old UNIQUE(slot) before creating the new composite unique constraint."""
     inspector = inspect(connection)
@@ -200,6 +255,11 @@ def init_db() -> None:
             ("background_settings", "tracker_id INTEGER", "tracker_id"),
         ):
             _add_column_if_missing(connection, table, column_sql, column_name)
+
+        # Existing Render/PostgreSQL deployments may contain a legacy
+        # background_settings.id column without an auto-generated value.
+        # Repair that schema before any request can create a new tracker.
+        _ensure_postgres_background_id_default(connection)
 
         if "ai_key_slots" in existing_tables:
             if connection.dialect.name == "sqlite":

@@ -183,7 +183,7 @@ class PointsEvent(Base):
 class BackgroundSetting(Base):
     __tablename__ = "background_settings"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tracker_id: Mapped[int | None] = mapped_column(ForeignKey("trackers.id"), nullable=True, unique=True)
     theme: Mapped[str] = mapped_column(String(20), nullable=False, default="glass")
     background_type: Mapped[str] = mapped_column(String(20), nullable=False, default="gradient")
