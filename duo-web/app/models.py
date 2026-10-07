@@ -178,3 +178,17 @@ class AIKeySlot(Base):
     last_status: Mapped[str] = mapped_column(String(30), nullable=False, default="untested")
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class User(Base):
+    """A login account. Each user owns one of the two player slots."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    invite_code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False)
+    player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

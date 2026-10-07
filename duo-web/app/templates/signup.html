@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duo Tracker · Sign up</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/auth.css">
+</head>
+<body data-theme="dark">
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="auth-wrap">
+  <main class="auth-card glass-panel">
+    <div class="auth-brand"><span class="brand-logo">D</span><strong>DUO TRACKER</strong></div>
+    <span class="mono-label">{% if first_user %}FIRST PLAYER{% else %}JOIN YOUR PARTNER{% endif %}</span>
+    <h1>Create account</h1>
+    <p class="lead">
+      {% if first_user %}You are the first one here. After you sign up you get a personal tracker code to share with your partner.
+      {% else %}Ask your partner for their 6-character tracker code. You can find it on their Account page.{% endif %}
+    </p>
+    {% if error %}<div class="auth-error" role="alert">{{ error }}</div><br>{% endif %}
+    <form class="auth-form" method="post" action="/signup">
+      <label>Your name<input type="text" name="name" value="{{ form.name or '' }}" maxlength="40" autocomplete="name" required autofocus></label>
+      <label>Email<input type="email" name="email" value="{{ form.email or '' }}" autocomplete="email" required></label>
+      <label>Password (8+ characters)<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
+      {% if not first_user %}
+      <label>Partner's tracker code<input class="code-input" type="text" name="code" value="{{ form.code or '' }}" maxlength="6" placeholder="••••••" autocomplete="off" required></label>
+      {% endif %}
+      <button class="primary-btn" type="submit">{% if first_user %}Create account{% else %}Join tracker{% endif %}</button>
+    </form>
+    <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+  </main>
+</div>
+</body>
+</html>

@@ -35,6 +35,7 @@
       {% endfor %}
     </nav>
     <div class="sidebar-bottom">
+      <a class="nav-item {% if page == 'account' %}active{% endif %}" href="/account"><span>👤</span> Account &amp; code</a>
       <a class="nav-item {% if page == 'settings' %}active{% endif %}" href="/settings"><span>⚙</span> Settings</a>
       <a class="export-link" href="/api/export.csv">Export CSV ↓</a>
     </div>

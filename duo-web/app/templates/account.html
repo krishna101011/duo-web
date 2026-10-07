@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Duo Tracker · Account{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <span class="mono-label">ACCOUNT</span>
+    <h1>Hi, {{ me.display_name }}.</h1>
+    <p>Your personal tracker code and your login details.</p>
+  </div>
+</div>
+
+<div class="account-grid">
+  <section class="account-card glass-panel">
+    <span class="mono-label">YOUR TRACKER CODE</span>
+    <div class="code-box">
+      <strong id="myCode">{{ me.invite_code }}</strong>
+      <button class="primary-btn" type="button" id="copyCode">Copy</button>
+    </div>
+    <p class="hint">Share this with your partner. They open the sign-up page and type it in to join you. Only share it with people you trust.</p>
+    <button class="secondary-btn" type="button" id="copyLink">Copy sign-up link</button>
+  </section>
+
+  <section class="account-card glass-panel">
+    <span class="mono-label">YOUR PARTNER</span>
+    {% if partner %}
+      <h2>{{ partner.display_name }}</h2>
+      <p>Joined and ready. Their code is <strong style="font-family:'DM Mono',monospace;letter-spacing:.2em">{{ partner.invite_code }}</strong>.</p>
+    {% else %}
+      <h2>Waiting for your partner</h2>
+      <p>No one has joined yet. Send them your code above.</p>
+    {% endif %}
+  </section>
+
+  <section class="account-card glass-panel">
+    <span class="mono-label">LOGIN</span>
+    <p>Signed in as <strong>{{ me.email }}</strong></p>
+    <form method="post" action="/logout"><button class="secondary-btn" type="submit">Log out</button></form>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  function copyText(text, button, label) {
+    navigator.clipboard.writeText(text).then(function () {
+      var old = button.textContent; button.textContent = label;
+      setTimeout(function () { button.textContent = old; }, 1500);
+    });
+  }
+  document.getElementById("copyCode").addEventListener("click", function (e) {
+    copyText(document.getElementById("myCode").textContent, e.target, "Copied ✓");
+  });
+  document.getElementById("copyLink").addEventListener("click", function (e) {
+    copyText(location.origin + "/signup?code=" + document.getElementById("myCode").textContent, e.target, "Link copied ✓");
+  });
+</script>
+{% endblock %}

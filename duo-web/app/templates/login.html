@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Duo Tracker · Log in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/auth.css">
+</head>
+<body data-theme="dark">
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="auth-wrap">
+  <main class="auth-card glass-panel">
+    <div class="auth-brand"><span class="brand-logo">D</span><strong>DUO TRACKER</strong></div>
+    <span class="mono-label">WELCOME BACK</span>
+    <h1>Log in</h1>
+    <p class="lead">Pick up where you and your partner left off.</p>
+    {% if error %}<div class="auth-error" role="alert">{{ error }}</div><br>{% endif %}
+    <form class="auth-form" method="post" action="/login">
+      <label>Email<input type="email" name="email" value="{{ email }}" autocomplete="email" required autofocus></label>
+      <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="primary-btn" type="submit">Log in</button>
+    </form>
+    <p class="auth-switch">New here? <a href="/signup">Create an account</a></p>
+  </main>
+</div>
+</body>
+</html>
