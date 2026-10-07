@@ -17,46 +17,7 @@ from ..models import BackgroundSetting, CustomTab, Player, Project
 from ..services.tenant import require_tracker
 
 router = APIRouter()
-
-
-class SafeJinja2Templates(Jinja2Templates):
-    """Render templates directly to HTMLResponse.
-
-    Starlette 1.7.0's internal _TemplateResponse calls .get() on the
-    request object stored in the context while handling the response. That
-    is incompatible with the Request object that FastAPI/Jinja expects in
-    the context. Rendering to a normal HTMLResponse avoids that framework
-    regression while preserving Jinja url_for() support.
-    """
-
-    def TemplateResponse(
-        self,
-        request,
-        name,
-        context=None,
-        status_code=200,
-        headers=None,
-        media_type=None,
-        background=None,
-    ):
-        render_context = dict(context or {})
-        render_context.setdefault("request", request)
-        template = self.get_template(name)
-        response = HTMLResponse(
-            template.render(render_context),
-            status_code=status_code,
-            headers=headers,
-            media_type=media_type,
-            background=background,
-        )
-        # Keep the attributes that Starlette's TemplateResponse exposes, so
-        # existing tests/debugging tools can still inspect the rendered template.
-        response.template = template
-        response.context = render_context
-        return response
-
-
-templates = SafeJinja2Templates(directory=str(settings.TEMPLATE_DIR))
+templates = Jinja2Templates(directory=str(settings.TEMPLATE_DIR))
 
 _GRADIENTS = {
     "glass:aurora": "linear-gradient(125deg,#eef3f8 0%,#dfe7ff 48%,#d8f2ed 100%)",
@@ -105,8 +66,22 @@ def context(request: Request, db: Session, **extra: object) -> dict:
     }
 
 
+def render_template(request: Request, name: str, ctx: dict | None = None, status_code: int = 200) -> HTMLResponse:
+    """Render Jinja directly into HTMLResponse.
+
+    Starlette 1.7.0's internal _TemplateResponse calls ``.get()`` on the
+    request object from the template context, which raises AttributeError.
+    Rendering the template ourselves avoids that response-layer regression
+    while keeping the normal Jinja ``request`` global available to templates.
+    """
+    render_context = dict(ctx or {})
+    render_context.setdefault("request", request)
+    html = templates.get_template(name).render(render_context)
+    return HTMLResponse(content=html, status_code=status_code)
+
+
 def _render(request: Request, template: str, db: Session, **extra: object):
-    return templates.TemplateResponse(request=request, name=template, context=context(request, db, **extra))
+    return render_template(request, template, context(request, db, **extra))
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -138,10 +113,10 @@ def project_detail(request: Request, project_id: int):
     with SessionLocal() as db:
         project = db.scalar(select(Project).where(Project.id == project_id, Project.tracker_id == require_tracker(db).id))
         if not project:
-            return templates.TemplateResponse(
-                request=request,
-                name="error.html",
-                context=context(request, db, code=404, message="Project not found."),
+            return render_template(
+                request,
+                "error.html",
+                context(request, db, code=404, message="Project not found."),
                 status_code=404,
             )
         return _render(request, "project_detail.html", db, page="projects", project=project)
@@ -170,10 +145,10 @@ def custom_tab(request: Request, tab_id: int):
     with SessionLocal() as db:
         tab = db.scalar(select(CustomTab).where(CustomTab.id == tab_id, CustomTab.tracker_id == require_tracker(db).id))
         if not tab:
-            return templates.TemplateResponse(
-                request=request,
-                name="error.html",
-                context=context(request, db, code=404, message="Custom tab not found."),
+            return render_template(
+                request,
+                "error.html",
+                context(request, db, code=404, message="Custom tab not found."),
                 status_code=404,
             )
         return _render(request, "custom_tab.html", db, page="custom", active_tab_id=tab.id, tab=tab)

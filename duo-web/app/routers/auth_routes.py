@@ -19,7 +19,7 @@ from ..db import SessionLocal
 from ..models import Player, Tracker, User
 from ..services.tenant import require_tracker
 from ..services.tracker import create_tracker_for_user, provision_tracker_settings, tracker_player_count
-from .pages import context, templates
+from .pages import context, render_template
 
 router = APIRouter()
 
@@ -38,12 +38,7 @@ def _set_login_cookie(response: RedirectResponse, user_id: int) -> RedirectRespo
 
 
 def _page(request: Request, name: str, status_code: int = 200, **ctx):
-    return templates.TemplateResponse(
-        request=request,
-        name=name,
-        context={"request": request, **ctx},
-        status_code=status_code,
-    )
+    return render_template(request, name, ctx, status_code=status_code)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -178,4 +173,4 @@ def account_page(request: Request):
         provision_tracker_settings(db, tracker.id)
         db.commit()
         ctx = context(request, db, page="account", me=me, partner=partner, tracker=tracker)
-        return templates.TemplateResponse(request=request, name="account.html", context=ctx)
+        return render_template(request, "account.html", ctx)
