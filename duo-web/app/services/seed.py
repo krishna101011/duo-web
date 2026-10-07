@@ -38,12 +38,14 @@ def seed_demo(db: Session) -> None:
         db.add(tracker)
         db.flush()
 
-    alex = Player(tracker_id=tracker_id, name="Alex", emoji="🧠", accent="accent")
-    sam = Player(tracker_id=tracker_id, name="Sam", emoji="⚡", accent="hot")
+    alex = Player(tracker_id=tracker.id, name="Alex", emoji="🧠", accent="accent")
+    sam = Player(tracker_id=tracker.id, name="Sam", emoji="⚡", accent="hot")
     db.add_all([alex, sam])
     db.flush()
 
-    db.add(BackgroundSetting(tracker_id=tracker_id, theme="glass", background_type="gradient", background_value="aurora"))
+    existing_bg = db.scalar(select(BackgroundSetting).where(BackgroundSetting.tracker_id == tracker.id))
+    if existing_bg is None:
+        db.add(BackgroundSetting(tracker_id=tracker.id, theme="glass", background_type="gradient", background_value="aurora"))
 
     study_samples = [
         (alex, 4, "Economics", "Microeconomics notes", 75),
@@ -80,9 +82,9 @@ def seed_demo(db: Session) -> None:
         stats.workout_minutes += minutes
         add_points(db, player.id, "workout", minutes * WORKOUT_POINTS_PER_MINUTE, minutes)
 
-    p1 = Project(tracker_id=tracker_id, name="Duo Tracker MVP", icon="🖥️", aim="Build a polished two-person self-improvement command center.", owner_id=alex.id)
-    p2 = Project(tracker_id=tracker_id, name="Debate Channel · E20", icon="🎬", aim="Research, storyboard, record, and publish the E20 debate.", owner_id=sam.id)
-    p3 = Project(tracker_id=tracker_id, name="Finance Learning Sprint", icon="📈", aim="Turn the reading backlog into a repeatable weekly learning sprint.", owner_id=alex.id)
+    p1 = Project(tracker_id=tracker.id, name="Duo Tracker MVP", icon="🖥️", aim="Build a polished two-person self-improvement command center.", owner_id=alex.id)
+    p2 = Project(tracker_id=tracker.id, name="Debate Channel · E20", icon="🎬", aim="Research, storyboard, record, and publish the E20 debate.", owner_id=sam.id)
+    p3 = Project(tracker_id=tracker.id, name="Finance Learning Sprint", icon="📈", aim="Turn the reading backlog into a repeatable weekly learning sprint.", owner_id=alex.id)
     db.add_all([p1, p2, p3])
     db.flush()
 
